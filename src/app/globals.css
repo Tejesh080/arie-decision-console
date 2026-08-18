@@ -1,26 +1,152 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------
+   ARIE design tokens — "decision instrument" system.
+   Always-dark. No light theme: this is a calibrated instrument panel for
+   one decision at a time, not a general-purpose app shell.
+   ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --bg: #0a0b0d;
+  --bg-raised: #101216;
+  --panel: #16181d;
+  --panel-2: #1d2026;
+  --border: #2a2d34;
+  --border-strong: #3c4048;
+
+  /* Text */
+  --text: #edeff2;
+  --text-dim: #9aa0ab;
+  --text-faint: #676c78;
+
+  /* Role colors — the machine / human / final separation is load-bearing,
+     not decorative. Every one of these carries meaning consistently across
+     the app; none is reused for anything else. */
+  --machine: #5b8cff; /* the policy's own recommendation */
+  --machine-dim: #2c3d66;
+  --human: #e0a530; /* a human reviewer's action */
+  --human-dim: #4a3a17;
+  --qualify: #3ecf8e; /* final outcome: routed/qualified */
+  --qualify-dim: #1c3d2e;
+  --reject: #e5636b; /* final outcome: rejected */
+  --reject-dim: #47232a;
+  --pending: #9aa0ab; /* awaiting / in progress, deliberately neutral */
+
+  /* Fonts (bound in layout.tsx via next/font, exposed as CSS vars) */
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-plex-sans), "Segoe UI", sans-serif;
+  --font-data: var(--font-plex-mono), ui-monospace, Menlo, Consolas, monospace;
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-faint: var(--text-faint);
+  --color-machine: var(--machine);
+  --color-machine-dim: var(--machine-dim);
+  --color-human: var(--human);
+  --color-human-dim: var(--human-dim);
+  --color-qualify: var(--qualify);
+  --color-qualify-dim: var(--qualify-dim);
+  --color-reject: var(--reject);
+  --color-reject-dim: var(--reject-dim);
+  --color-pending: var(--pending);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-data: var(--font-data);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss01";
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-raised);
+  color: var(--text);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: var(--font-body);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--machine);
+  background: var(--panel-2);
+}
+
+.input:disabled,
+.textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-faint);
+}
+
+/* Fine grain texture — an instrument panel, not a flat gradient. Applied
+   once to the body via a pseudo-element so it never repaints on scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: var(--machine-dim);
+  color: var(--text);
+}
+
+/* Tabular figures everywhere numbers are compared vertically. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

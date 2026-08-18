@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ARIE Decision Console
 
-## Getting Started
+The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine) — submit a lead, watch it move through evidence, scoring, and a decision, and see exactly why ARIE stopped where it did. When ARIE escalates a decision to a human, this is where that review happens: the machine's recommendation, the human's action, and the final outcome stay visible together, never collapsed into one.
 
-First, run the development server:
+Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no auth, no real enrichment providers — see [Non-goals](#non-goals).
+
+---
+
+## Two ways to run it
+
+### Mock mode (default — no backend required)
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). Mock mode reproduces the app's full shape — bounded processing, real optimistic-concurrency and idempotency semantics on review decisions — against realistic, fabricated data, persisted to `localStorage` so a browser refresh reconstructs state exactly the way "api" mode does from the real backend. No `.env.local` needed; `NEXT_PUBLIC_ARIE_DATA_MODE` defaults to `mock` when unset. Good for screenshots, portfolio preview, and UI work without Docker.
+
+### Real ARIE mode
+
+**Prerequisite: the ARIE backend running locally at `http://localhost:8000`.** In the [`adaptive-revenue-intelligence-engine`](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine) repo (a sibling checkout, not part of this repo):
+
+```powershell
+docker compose up -d
+```
+
+Then, in this repo:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_ARIE_DATA_MODE=api
+NEXT_PUBLIC_ARIE_API_BASE_URL=http://localhost:8000
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) — the connection status badge in the header confirms it can reach ARIE.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Why a proxy, not direct browser calls.** The ARIE backend has no CORS middleware (confirmed against its source, not assumed), so a browser calling `http://localhost:8000` directly from a different origin would be blocked. Every request instead goes to this app's own server-side Route Handlers under `src/app/api/arie/*`, which forward to the backend server-to-server, where CORS doesn't apply. `NEXT_PUBLIC_ARIE_API_BASE_URL` is read there, and nowhere else — no component ever hardcodes `localhost:8000`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Mode never silently falls back.** If `NEXT_PUBLIC_ARIE_DATA_MODE=api` and the backend is unreachable, the UI shows a clear "ARIE backend unavailable" state with a retry button — it does not quietly serve mock data instead, which would be indistinguishable from a real (if unlikely) result.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Human review demo
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The clearest way to see the whole product thesis — a machine recommendation that isn't automatically actionable, and a human decision that becomes the record of what actually happened without erasing what the machine said.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Start either mode above.
+2. Go to **New lead**, click the **Nadia Haddad — human escalation** preset, and submit.
+3. ARIE evaluates all 8 providers and still can't clear its autonomy threshold — the receipt shows the machine's recommendation (**Reject**), why it isn't autonomous, and a **Human review required** panel.
+4. Pick **Reviewer**, choose **Approve** (or **Reject**, or **Edit** with required notes), click **Submit decision**, then confirm.
+5. The page updates to show all three stages at once: **Machine recommendation → Human action → Final outcome**, with a **Human override** badge — the recommendation was Reject, the outcome is Auto-routed, and both stay visible.
+6. Refresh the browser. The same state comes back — reconstructed from the backend (or, in mock mode, from `localStorage`), not from in-memory UI state that a reload would lose.
 
-## Deploy on Vercel
+The **Nadia Delacroix — autonomous** preset shows the other path: enough evidence, high enough confidence, no human involved at all.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
+
+```
+src/lib/api/
+  types.ts        Types mirroring the backend's public HTTP contract exactly
+  mode.ts         "mock" | "api", from NEXT_PUBLIC_ARIE_DATA_MODE
+  errors.ts       Typed error hierarchy (NotFound / Conflict / Validation / Unavailable / Timeout)
+  client.ts       Low-level fetch wrapper — only ever calls this app's own /api/arie/* proxy
+  leads.ts, receipts.ts, reviews.ts, health.ts
+                  One typed function per backend operation; each checks the
+                  mode and delegates to client.ts (api) or mock/store.ts (mock)
+  polling.ts      Bounded polling for a lead to leave the auto-advancing state chain
+  server/proxy.ts Server-only forwarding to the real backend (Route Handlers only)
+  mock/store.ts   Mock mode's entire fabricated "backend", localStorage-backed
+
+src/app/api/arie/ Route Handlers proxying 1:1 to the backend's endpoints
+src/components/    UI — receipt/ holds the gauges, evidence panel, and review panel
+src/lib/format/    Display formatting + the LeadStatus -> label / badge-tone mappings
+```
+
+Every API call goes through the typed functions in `src/lib/api/` — no component constructs a fetch URL or reads `NEXT_PUBLIC_ARIE_API_BASE_URL` directly.
+
+### Backend endpoints integrated
+
+`POST /leads`, `GET /leads/{id}`, `GET /leads/{id}/receipt`, `GET /reviews/{id}`, `POST /reviews/{id}/decision`, `GET /healthz` — confirmed against the backend's own source (`src/arie/api/schemas.py`, `src/arie/core/types.py`, `src/arie/approval/workflow.py`), not guessed. The backend has no endpoint to list leads server-side, so the dashboard's "recently submitted" list is explicitly local browser history, not a claim about server state.
+
+---
+
+## Scripts
+
+```bash
+npm run dev          # start the dev server
+npm run build         # production build
+npm run lint          # ESLint
+npm run typecheck     # tsc --noEmit
+npm run test           # Vitest (unit/component)
+npm run test:e2e       # Playwright — see e2e/ (run the dev server first, in the mode you want to test)
+```
+
+---
+
+## Non-goals
+
+Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers, production hosting. This is real local API integration + the Decision Receipt + the human review UI, and nothing past that.
