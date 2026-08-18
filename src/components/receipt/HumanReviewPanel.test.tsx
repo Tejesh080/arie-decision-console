@@ -241,4 +241,45 @@ describe("HumanReviewPanel — resolved review", () => {
     expect(document.querySelector("img")).not.toBeInTheDocument();
     expect(screen.getByText(/<img src=x onerror="alert\(1\)">/)).toBeInTheDocument();
   });
+
+  it.each([null, "", "   ", "NA", "N/A", "n/a", " na "])(
+    "shows 'No reviewer note' instead of quoting a meaningless note (%j)",
+    (notes) => {
+      render(
+        <HumanReviewPanel
+          review={makePendingReview({
+            is_pending: false,
+            reviewer: "jane",
+            final_decision: "auto_route",
+            notes,
+            responded_at: "2026-01-01T01:00:00Z",
+          })}
+          receipt={makeReceipt({ lead_status: "AUTO_ROUTED" })}
+          onDecided={vi.fn()}
+          onConflict={vi.fn()}
+        />,
+      );
+      expect(screen.getByText("No reviewer note")).toBeInTheDocument();
+      expect(screen.queryByText(/[“"]/)).not.toBeInTheDocument();
+    },
+  );
+
+  it("still quotes a real reviewer note", () => {
+    render(
+      <HumanReviewPanel
+        review={makePendingReview({
+          is_pending: false,
+          reviewer: "jane",
+          final_decision: "auto_route",
+          notes: "Verified via LinkedIn, title matches.",
+          responded_at: "2026-01-01T01:00:00Z",
+        })}
+        receipt={makeReceipt({ lead_status: "AUTO_ROUTED" })}
+        onDecided={vi.fn()}
+        onConflict={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Verified via LinkedIn, title matches\./)).toBeInTheDocument();
+    expect(screen.queryByText("No reviewer note")).not.toBeInTheDocument();
+  });
 });

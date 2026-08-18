@@ -45,7 +45,11 @@ export function EvidencePanel({
           tone="neutral"
           items={providers.not_called}
           empty="All providers were called"
-          footnote="Not evaluated and rejected — simply not reached before ARIE stopped."
+          footnote={
+            providers.not_called.length > 0
+              ? "Not evaluated and rejected — simply not reached before ARIE stopped."
+              : undefined
+          }
         />
       </div>
 

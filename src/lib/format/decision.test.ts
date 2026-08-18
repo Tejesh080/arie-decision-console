@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decisionLabel, reviewActionLabel, toneForStatus } from "./decision";
+import { decisionLabel, reviewActionLabel, reviewerNote, toneForStatus } from "./decision";
 import type { LeadStatus } from "@/lib/api/types";
 
 describe("decisionLabel", () => {
@@ -23,6 +23,19 @@ describe("reviewActionLabel", () => {
 
   it("renders a dash for a pending (null) action", () => {
     expect(reviewActionLabel(null)).toBe("—");
+  });
+});
+
+describe("reviewerNote", () => {
+  it.each([null, undefined, "", "   ", "NA", "N/A", "n/a", " na "])(
+    "treats %j as an absent note",
+    (input) => {
+      expect(reviewerNote(input)).toBeNull();
+    },
+  );
+
+  it("trims and returns a real note", () => {
+    expect(reviewerNote("  Title was misread  ")).toBe("Title was misread");
   });
 });
 

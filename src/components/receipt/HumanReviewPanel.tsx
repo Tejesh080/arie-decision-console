@@ -5,7 +5,12 @@ import { motion } from "motion/react";
 import type { ReceiptResponse, ReviewAction, ReviewResponse } from "@/lib/api/types";
 import { submitReviewDecision } from "@/lib/api/reviews";
 import { ArieApiError, ArieConflictError, ArieValidationError } from "@/lib/api/errors";
-import { decisionLabel, reviewActionLabel, toneForStatus } from "@/lib/format/decision";
+import {
+  decisionLabel,
+  reviewActionLabel,
+  reviewerNote,
+  toneForStatus,
+} from "@/lib/format/decision";
 import { statusLabel } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
 import { Eyebrow, Panel } from "@/components/ui/Panel";
@@ -218,6 +223,7 @@ function ResolvedSequence({
   receipt: ReceiptResponse;
 }) {
   const finalTone = toneForStatus(receipt.lead_status);
+  const note = reviewerNote(review.notes);
   return (
     <div className="flex flex-col gap-4">
       <SequenceStage
@@ -231,7 +237,11 @@ function ResolvedSequence({
         title={`Human action — ${review.reviewer ?? "unknown reviewer"}`}
         headline={reviewActionLabel(receiptActionFromReview(review))}
       >
-        {review.notes && <p className="mt-2 text-sm text-text-dim">“{review.notes}”</p>}
+        {note ? (
+          <p className="mt-2 text-sm text-text-dim">“{note}”</p>
+        ) : (
+          <p className="mt-2 text-sm text-text-faint">No reviewer note</p>
+        )}
       </SequenceStage>
       <Connector />
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>

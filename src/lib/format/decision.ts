@@ -28,6 +28,19 @@ export function reviewActionLabel(action: string | null): string {
   return REVIEW_ACTION_LABELS[action] ?? action;
 }
 
+const EMPTY_NOTE_PLACEHOLDERS = new Set(["na", "n/a"]);
+
+/** Reviewers sometimes type a literal "NA" / "N/A" placeholder instead of
+ * leaving the field blank — treat that the same as no note so the UI never
+ * quotes a non-answer as if it were real reviewer input. */
+export function reviewerNote(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const trimmed = notes.trim();
+  if (trimmed.length === 0) return null;
+  if (EMPTY_NOTE_PLACEHOLDERS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+}
+
 /** Which of the app's four semantic roles a lead status belongs to, for
  * consistent badge coloring — mirrors `arie.statemachine.transitions`'s own
  * QUALIFIED/REJECTED/AWAITING_REVIEW/FAILURE groups exactly. */

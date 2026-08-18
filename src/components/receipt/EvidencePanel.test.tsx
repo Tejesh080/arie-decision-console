@@ -76,5 +76,7 @@ describe("EvidencePanel", () => {
     expect(screen.getByText("Fresh calls (0)")).toBeInTheDocument();
     expect(screen.getAllByText("None this run").length).toBeGreaterThan(0);
     expect(screen.getByText("All providers were called")).toBeInTheDocument();
+    // With nothing left uncalled there's no "not reached" story to tell.
+    expect(screen.queryByText(/Not evaluated and rejected/)).not.toBeInTheDocument();
   });
 });
