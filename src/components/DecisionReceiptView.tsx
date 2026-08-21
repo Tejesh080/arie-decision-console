@@ -184,7 +184,22 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
 
       {receipt.status === "decided" && receipt.decision && receipt.score && receipt.stopping && (
         <>
-          {receipt.human_review && review ? (
+          {receipt.shadow ? (
+            <Panel accent="shadow">
+              <div className="flex items-center gap-2">
+                <Eyebrow>Shadow evaluation</Eyebrow>
+                <Badge tone="shadow">No routing action executed</Badge>
+              </div>
+              <p className="mt-2 font-display text-2xl font-medium text-shadow">
+                Would have recommended: {decisionLabel(receipt.decision.recommended_action)}
+              </p>
+              <p className="mt-1 text-sm text-text-dim">
+                ARIE computed this recommendation alongside an existing workflow but took no
+                authoritative action — no auto-route, no reject, no human review opened. This is
+                what ARIE would have done, not what happened.
+              </p>
+            </Panel>
+          ) : receipt.human_review && review ? (
             <HumanReviewPanel
               review={review}
               receipt={receipt}

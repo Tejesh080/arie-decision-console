@@ -17,6 +17,7 @@ function makeReceipt(overrides: Partial<ReceiptResponse> = {}): ReceiptResponse 
     status: "decided",
     lead_status: "AWAITING_HUMAN",
     created_at: "2026-01-01T00:00:00Z",
+    shadow: false,
     decision: {
       recommended_action: "reject",
       autonomous: false,

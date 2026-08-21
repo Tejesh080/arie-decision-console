@@ -8,7 +8,7 @@ export function Panel({
 }: {
   children: ReactNode;
   className?: string;
-  accent?: "machine" | "human" | "qualify" | "reject";
+  accent?: "machine" | "human" | "qualify" | "reject" | "shadow";
 }) {
   return (
     <div
@@ -18,6 +18,7 @@ export function Panel({
         accent === "human" && "border-l-2 border-l-human",
         accent === "qualify" && "border-l-2 border-l-qualify",
         accent === "reject" && "border-l-2 border-l-reject",
+        accent === "shadow" && "border-l-2 border-l-shadow",
         className,
       )}
     >

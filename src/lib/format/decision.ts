@@ -3,6 +3,7 @@ import {
   FAILURE_STATUSES,
   QUALIFIED_STATUSES,
   REJECTED_STATUSES,
+  SHADOW_STATUSES,
   type LeadStatus,
 } from "@/lib/api/types";
 import type { BadgeTone } from "@/components/ui/Badge";
@@ -45,6 +46,7 @@ export function reviewerNote(notes: string | null | undefined): string | null {
  * consistent badge coloring — mirrors `arie.statemachine.transitions`'s own
  * QUALIFIED/REJECTED/AWAITING_REVIEW/FAILURE groups exactly. */
 export function toneForStatus(status: LeadStatus): BadgeTone {
+  if (SHADOW_STATUSES.includes(status)) return "shadow";
   if (QUALIFIED_STATUSES.includes(status)) return "qualify";
   if (REJECTED_STATUSES.includes(status)) return "reject";
   if (AWAITING_REVIEW_STATUSES.includes(status)) return "human";

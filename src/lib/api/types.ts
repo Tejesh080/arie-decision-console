@@ -31,7 +31,8 @@ export type LeadStatus =
   | "ROUTED"
   | "SYNCED"
   | "FAILED"
-  | "DEAD_LETTER";
+  | "DEAD_LETTER"
+  | "SHADOW_EVALUATED";
 
 /**
  * Business-semantic status groups, mirroring
@@ -43,6 +44,11 @@ export const QUALIFIED_STATUSES: readonly LeadStatus[] = ["AUTO_ROUTED", "ROUTED
 export const REJECTED_STATUSES: readonly LeadStatus[] = ["SYNCED"];
 export const AWAITING_REVIEW_STATUSES: readonly LeadStatus[] = ["AWAITING_HUMAN"];
 export const FAILURE_STATUSES: readonly LeadStatus[] = ["FAILED", "DEAD_LETTER"];
+/** Post-M1 P5 — a shadow-mode lead's terminal status. Never authoritative:
+ * no routing action taken, no review opened. Kept out of every other group
+ * above on purpose, so nothing accidentally treats it as qualified/rejected/
+ * awaiting-review/failed. */
+export const SHADOW_STATUSES: readonly LeadStatus[] = ["SHADOW_EVALUATED"];
 export const FINALIZED_STATUSES: readonly LeadStatus[] = [
   ...QUALIFIED_STATUSES,
   ...REJECTED_STATUSES,
@@ -87,6 +93,10 @@ export interface IngestLeadRequest {
   title?: string | null;
   /** Decimal, sent as a string (e.g. "1.50"). Omit to use the backend default. */
   budget_usd_cap?: string | null;
+  /** Post-M1 P5. `"shadow"` computes ARIE's full recommendation with no
+   * authoritative routing action and no human review opened — see
+   * `IngestLeadResponse.is_shadow`. Omit for the default `"normal"`. */
+  mode?: "normal" | "shadow";
 }
 
 export interface IngestLeadResponse {
@@ -98,6 +108,9 @@ export interface IngestLeadResponse {
   job_id: string;
   job_created: boolean;
   job_requeued: boolean;
+  /** The persisted shadow flag — may differ from this request's own `mode`
+   * if `(source, external_ref)` already existed under a different mode. */
+  is_shadow: boolean;
 }
 
 export interface LeadCostResponse {
@@ -118,6 +131,7 @@ export interface LeadResponse {
   company_id: string | null;
   person_id: string | null;
   budget_usd_cap: string;
+  is_shadow: boolean;
   created_at: string;
   updated_at: string;
   cost: LeadCostResponse;
@@ -218,6 +232,12 @@ export interface ReceiptResponse {
   status: ReceiptStatus;
   lead_status: LeadStatus;
   created_at: string | null;
+  /** Post-M1 P5. When true, `decision`/`score`/`stopping` describe what ARIE
+   * *would have* done — no authoritative routing action was taken and no
+   * human review was opened, regardless of what `decision.recommended_action`
+   * says. Never render a shadow receipt as if `lead_status` were the real
+   * `AUTO_ROUTED`/`AWAITING_HUMAN` it structurally resembles. */
+  shadow: boolean;
   decision: ReceiptDecision | null;
   score: ReceiptScore | null;
   stopping: ReceiptStopping | null;

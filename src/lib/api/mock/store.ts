@@ -239,6 +239,7 @@ interface MockLead {
   status: LeadStatus;
   scenario: ScenarioTemplate;
   review: ReviewRecord | null;
+  isShadow: boolean;
 }
 
 interface StoreShape {
@@ -281,6 +282,10 @@ function externalKey(source: string, externalRef: string | null | undefined): st
 function deriveStatus(lead: MockLead, nowMs: number): LeadStatus {
   const elapsed = nowMs - lead.createdAtMs;
   if (elapsed >= STAGE_BOUNDS_MS.SETTLED) {
+    // Shadow mode is fixed at creation and never opens a review or takes an
+    // authoritative routing action, regardless of which scenario's evidence
+    // it reuses -- see IngestLeadRequest.mode's own doc comment.
+    if (lead.isShadow) return "SHADOW_EVALUATED";
     if (lead.review) {
       return lead.review.final_decision
         ? statusForFinalDecision(lead.review.final_decision)
@@ -346,6 +351,7 @@ class MockArieStore {
         job_id: crypto.randomUUID(),
         job_created: false,
         job_requeued: false,
+        is_shadow: existing.isShadow,
       };
     }
 
@@ -367,6 +373,7 @@ class MockArieStore {
       status: "NEW",
       scenario: templateForEmail(input.email),
       review: null,
+      isShadow: input.mode === "shadow",
     };
 
     store.leadsById[lead.lead_id] = lead;
@@ -382,6 +389,7 @@ class MockArieStore {
       job_id: crypto.randomUUID(),
       job_created: true,
       job_requeued: false,
+      is_shadow: lead.isShadow,
     };
   }
 
@@ -392,6 +400,7 @@ class MockArieStore {
   }
 
   private maybeOpenReview(lead: MockLead, nowMs: number): void {
+    if (lead.isShadow) return;
     if (lead.review) return;
     if (lead.scenario.finalStatus !== "AWAITING_HUMAN") return;
     if (!isSettled(lead, nowMs)) return;
@@ -427,6 +436,7 @@ class MockArieStore {
       company_id: lead.company_id,
       person_id: lead.person_id,
       budget_usd_cap: lead.budget_usd_cap,
+      is_shadow: lead.isShadow,
       created_at: lead.created_at,
       updated_at: new Date(now).toISOString(),
       cost: {
@@ -459,6 +469,7 @@ class MockArieStore {
         status: "pending",
         lead_status: status,
         created_at: null,
+        shadow: lead.isShadow,
         decision: null,
         score: null,
         stopping: null,
@@ -486,6 +497,7 @@ class MockArieStore {
       status: "decided",
       lead_status: finalStatus,
       created_at: new Date(lead.createdAtMs + STAGE_BOUNDS_MS.SETTLED).toISOString(),
+      shadow: lead.isShadow,
       decision: {
         recommended_action: lead.scenario.recommendedAction,
         autonomous: lead.scenario.autonomous,

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
 
-export type BadgeTone = "machine" | "human" | "qualify" | "reject" | "pending" | "neutral";
+export type BadgeTone =
+  "machine" | "human" | "qualify" | "reject" | "pending" | "neutral" | "shadow";
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
   machine: "bg-machine-dim text-machine border-machine/40",
@@ -10,6 +11,7 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
   reject: "bg-reject-dim text-reject border-reject/40",
   pending: "bg-panel-2 text-pending border-border-strong",
   neutral: "bg-panel-2 text-text-dim border-border-strong",
+  shadow: "bg-shadow-dim text-shadow border-shadow/40",
 };
 
 export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; children: ReactNode }) {

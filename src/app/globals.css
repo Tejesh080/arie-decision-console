@@ -31,6 +31,8 @@
   --reject: #e5636b; /* final outcome: rejected */
   --reject-dim: #47232a;
   --pending: #9aa0ab; /* awaiting / in progress, deliberately neutral */
+  --shadow: #a78bfa; /* shadow-mode evaluation: computed, never authoritative */
+  --shadow-dim: #332a4d;
 
   /* Fonts (bound in layout.tsx via next/font, exposed as CSS vars) */
   --font-display: var(--font-fraunces), Georgia, serif;
@@ -59,6 +61,8 @@
   --color-reject: var(--reject);
   --color-reject-dim: var(--reject-dim);
   --color-pending: var(--pending);
+  --color-shadow: var(--shadow);
+  --color-shadow-dim: var(--shadow-dim);
 
   --font-display: var(--font-display);
   --font-body: var(--font-body);

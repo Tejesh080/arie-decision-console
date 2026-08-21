@@ -10,6 +10,8 @@ export interface RecentLeadEntry {
   label: string;
   email: string;
   submitted_at: string;
+  /** Optional so entries saved before this field existed still parse. */
+  is_shadow?: boolean;
 }
 
 const KEY = "arie-web:recent-leads:v1";

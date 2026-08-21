@@ -16,6 +16,7 @@ function lead(status: LeadResponse["status"]): LeadResponse {
     company_id: null,
     person_id: null,
     budget_usd_cap: "1.50",
+    is_shadow: false,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     cost: {

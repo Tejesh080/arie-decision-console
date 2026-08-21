@@ -6,6 +6,7 @@ import { getDataMode } from "@/lib/api/mode";
 import { getRecentLeads, type RecentLeadEntry } from "@/lib/localHistory";
 import { formatDateTime } from "@/lib/format";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
+import { Badge } from "@/components/ui/Badge";
 
 export default function DashboardPage() {
   const mode = getDataMode();
@@ -87,7 +88,10 @@ export default function DashboardPage() {
                   href={`/leads/${entry.lead_id}`}
                   className="block rounded-xl border border-border bg-panel p-5 transition-colors hover:border-border-strong hover:bg-panel-2"
                 >
-                  <p className="font-medium text-text">{entry.label}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-text">{entry.label}</p>
+                    {entry.is_shadow && <Badge tone="shadow">Shadow</Badge>}
+                  </div>
                   <p className="mt-1 font-data text-xs text-text-faint">{entry.email}</p>
                   <p className="mt-3 font-data text-[0.7rem] uppercase tracking-wider text-text-faint">
                     Submitted {formatDateTime(entry.submitted_at)}

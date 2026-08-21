@@ -25,6 +25,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   SYNCED: "Rejected",
   FAILED: "Failed",
   DEAD_LETTER: "Failed — retries exhausted",
+  SHADOW_EVALUATED: "Shadow evaluated",
 };
 
 export function statusLabel(status: LeadStatus): string {

@@ -51,6 +51,7 @@ export function NewLeadForm() {
   const [companyDomain, setCompanyDomain] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [externalRef, setExternalRef] = useState(freshExternalRef);
+  const [shadowMode, setShadowMode] = useState(false);
 
   const [state, setState] = useState<FlowState>("idle");
   const [currentStatus, setCurrentStatus] = useState<LeadStatus | null>(null);
@@ -79,6 +80,7 @@ export function NewLeadForm() {
           company_domain: companyDomain || null,
           company_name: companyName || null,
           external_ref: externalRef || null,
+          mode: shadowMode ? "shadow" : "normal",
         });
         setSubmittedLeadId(result.lead_id);
         setState("processing");
@@ -91,6 +93,7 @@ export function NewLeadForm() {
           label: fullName || email,
           email,
           submitted_at: new Date().toISOString(),
+          is_shadow: result.is_shadow,
         });
         router.push(`/leads/${result.lead_id}`);
       } catch (err) {
@@ -106,7 +109,7 @@ export function NewLeadForm() {
         }
       }
     },
-    [source, email, fullName, companyDomain, companyName, externalRef, router],
+    [source, email, fullName, companyDomain, companyName, externalRef, shadowMode, router],
   );
 
   const isBusy = state === "submitting" || state === "processing";
@@ -181,6 +184,23 @@ export function NewLeadForm() {
               />
             </Field>
           </div>
+
+          <label className="flex items-start gap-2.5 rounded-lg border border-border bg-bg-raised px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={shadowMode}
+              onChange={(e) => setShadowMode(e.target.checked)}
+              disabled={isBusy}
+              className="mt-0.5 h-4 w-4 accent-shadow"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-text">Shadow mode</span>
+              <span className="block text-xs text-text-faint">
+                ARIE computes its full recommendation but takes no authoritative action — no
+                auto-route, no reject, no human review opened.
+              </span>
+            </span>
+          </label>
 
           <div className="mt-2 flex items-center gap-3">
             <button
