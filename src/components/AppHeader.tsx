@@ -15,7 +15,7 @@ export function AppHeader() {
               Decision Console
             </span>
           </Link>
-          <nav className="hidden items-center gap-6 text-sm text-text-dim sm:flex">
+          <nav className="flex items-center gap-4 text-sm text-text-dim sm:gap-6">
             <Link href="/" className="transition-colors hover:text-text">
               Dashboard
             </Link>
@@ -24,7 +24,11 @@ export function AppHeader() {
             </Link>
           </nav>
         </div>
-        <ConnectionStatus />
+        {/* Status over navigation is the wrong trade on a narrow screen --
+            hidden below sm rather than shrinking the nav to make room for it. */}
+        <div className="hidden sm:block">
+          <ConnectionStatus />
+        </div>
       </div>
     </header>
   );
