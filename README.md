@@ -65,6 +65,12 @@ The **Nadia Delacroix — autonomous** preset shows the other path: enough evide
 
 ---
 
+## Shadow mode
+
+A third path, distinct from both of the above: check **Shadow mode** on the New Lead form before submitting. ARIE still runs the full evidence/scoring/confidence pipeline and computes a real recommendation — but takes no authoritative action. No auto-route, no reject, no human review opened. The receipt renders this as a dedicated **Shadow evaluation** panel ("Would have recommended: …"), with its own status color, never presented as if it were a real `AUTO_ROUTED`/`AWAITING_HUMAN` outcome. This is what lets ARIE sit alongside an existing workflow and prove its recommendations before ever controlling anything.
+
+---
+
 ## Architecture
 
 ```
@@ -106,6 +112,24 @@ npm run test:e2e       # Playwright — see e2e/ (run the dev server first, in t
 
 ---
 
+## Deploy to Vercel
+
+The app is a stateless Next.js frontend with one server-side dependency: the ARIE backend's public URL. No database, no secrets of its own.
+
+1. [Import this repo](https://vercel.com/new) into Vercel. Framework preset (Next.js) and build settings are auto-detected — leave them as-is.
+2. Add one environment variable:
+
+   | Name | Value |
+   |---|---|
+   | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine#hosted-deployment) |
+
+   Leave `NEXT_PUBLIC_ARIE_DATA_MODE` unset for mock mode (safe default, no backend dependency at all), or set it to `api` once you want the deployed app to talk to the real hosted backend.
+3. Deploy. Nothing else is required — the same server-side proxy architecture (`src/app/api/arie/*`) that talks to a local Docker backend talks to the hosted one identically; only the URL changes.
+
+Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, or any provider API key here — this app never needs them and never sees them; only the backend does.
+
+---
+
 ## Non-goals
 
-Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers, production hosting. This is real local API integration + the Decision Receipt + the human review UI, and nothing past that.
+Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers. Production *hosting* (Vercel, above) is in scope; a production *security posture* — auth, tenancy, rate limiting — is not.
