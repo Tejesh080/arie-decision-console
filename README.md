@@ -4,6 +4,8 @@ The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/T
 
 Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no auth, no real enrichment providers — see [Non-goals](#non-goals).
 
+**[Live demo](https://arie-web.vercel.app/)** — hosted on Vercel, talking to the real hosted backend (Railway + Supabase) through this app's own server-side proxy. See [Deploy to Vercel](#deploy-to-vercel) below for how it's configured.
+
 ---
 
 ## Two ways to run it
@@ -119,17 +121,20 @@ The app is a stateless Next.js frontend with one server-side dependency: the ARI
 1. [Import this repo](https://vercel.com/new) into Vercel. Framework preset (Next.js) and build settings are auto-detected — leave them as-is.
 2. Add one environment variable:
 
-   | Name | Value |
-   |---|---|
+   | Name                            | Value                                                                                                                                                |
+   | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
    | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine#hosted-deployment) |
 
    Leave `NEXT_PUBLIC_ARIE_DATA_MODE` unset for mock mode (safe default, no backend dependency at all), or set it to `api` once you want the deployed app to talk to the real hosted backend.
+
 3. Deploy. Nothing else is required — the same server-side proxy architecture (`src/app/api/arie/*`) that talks to a local Docker backend talks to the hosted one identically; only the URL changes.
 
 Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, or any provider API key here — this app never needs them and never sees them; only the backend does.
+
+**The live demo above runs with `NEXT_PUBLIC_ARIE_DATA_MODE=api`**, verified end to end against the real Railway backend: an autonomous decision, a human-review approval with the machine recommendation kept separate from the human action and the final outcome, and a shadow evaluation, all through the deployed UI — not just a healthcheck. A Vercel env var change doesn't apply to an already-running deployment; redeploy after changing one.
 
 ---
 
 ## Non-goals
 
-Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers. Production *hosting* (Vercel, above) is in scope; a production *security posture* — auth, tenancy, rate limiting — is not.
+Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers. Production _hosting_ (Vercel, above) is in scope; a production _security posture_ — auth, tenancy, rate limiting — is not.
