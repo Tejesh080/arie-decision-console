@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { CircleAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import clsx from "clsx";
 import type { ReceiptResponse, ReviewAction, ReviewResponse } from "@/lib/api/types";
 import { submitReviewDecision } from "@/lib/api/reviews";
 import { ArieApiError, ArieConflictError, ArieValidationError } from "@/lib/api/errors";
@@ -11,9 +13,11 @@ import {
   reviewerNote,
   toneForStatus,
 } from "@/lib/format/decision";
-import { statusLabel } from "@/lib/format";
+import { formatPercent, formatScore, statusLabel } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
-import { Eyebrow, Panel } from "@/components/ui/Panel";
+import { Button } from "@/components/ui/Button";
+import { Eyebrow } from "@/components/ui/Panel";
+import { Chain, Connector, Stage, type StageRole } from "./DecisionChain";
 
 interface Props {
   review: ReviewResponse;
@@ -22,10 +26,30 @@ interface Props {
   onConflict: (message: string) => void;
 }
 
-const ACTIONS: { value: ReviewAction; label: string; tone: "qualify" | "reject" | "human" }[] = [
-  { value: "approve", label: "Approve", tone: "qualify" },
-  { value: "reject", label: "Reject", tone: "reject" },
-  { value: "edit", label: "Edit", tone: "human" },
+const ACTIONS: {
+  value: ReviewAction;
+  label: string;
+  tone: "qualify" | "reject" | "human";
+  blurb: string;
+}[] = [
+  {
+    value: "approve",
+    label: "Approve",
+    tone: "qualify",
+    blurb: "Accept ARIE's recommendation and let it route.",
+  },
+  {
+    value: "reject",
+    label: "Reject",
+    tone: "reject",
+    blurb: "Turn this lead down.",
+  },
+  {
+    value: "edit",
+    label: "Edit",
+    tone: "human",
+    blurb: "Override with a manual outcome. A note is required.",
+  },
 ];
 
 export function HumanReviewPanel({ review, receipt, onDecided, onConflict }: Props) {
@@ -42,6 +66,8 @@ export function HumanReviewPanel({ review, receipt, onDecided, onConflict }: Pro
   );
 }
 
+/* -------------------------------------------------------------- pending -- */
+
 function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
   const [reviewer, setReviewer] = useState("arie-web");
   const [action, setAction] = useState<ReviewAction>("approve");
@@ -52,9 +78,13 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
 
   const notesRequired = action === "edit";
   const canSubmit = reviewer.trim().length > 0 && (!notesRequired || notes.trim().length > 0);
+  const selected = ACTIONS.find((a) => a.value === action)!;
 
   function pickAction(next: ReviewAction) {
     setAction(next);
+    // Changing what you are about to do must always disarm the confirm --
+    // otherwise a second click could commit an action the reviewer never
+    // confirmed.
     setArmed(false);
     setError(null);
   }
@@ -69,13 +99,12 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await submitReviewDecision(review.review_id, {
+      await submitReviewDecision(review.review_id, {
         action,
         reviewer: reviewer.trim(),
         notes: notes.trim() || null,
         expected_lead_version: review.lead_version,
       });
-      void result;
       onDecided();
     } catch (err) {
       if (err instanceof ArieConflictError) {
@@ -96,29 +125,54 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <SequenceStage
+    <Chain>
+      <Stage
         role="machine"
-        title="Machine recommendation"
+        label="Machine recommendation"
         headline={decisionLabel(receipt.decision?.recommended_action ?? "—")}
+        index={0}
       >
-        <dl className="mt-3 grid grid-cols-2 gap-y-1.5 text-sm">
-          <dt className="text-text-faint">Autonomous?</dt>
-          <dd className="text-text">{receipt.decision?.autonomous ? "Yes" : "No"}</dd>
-          <dt className="text-text-faint">Why?</dt>
-          <dd className="text-text-dim">{receipt.stopping?.explanation ?? "—"}</dd>
-        </dl>
-      </SequenceStage>
-
-      <Connector />
-
-      <Panel accent="human">
-        <Eyebrow>Human review required</Eyebrow>
-        <p className="mt-1 text-sm text-text-dim">
-          Confidence did not clear the autonomy threshold. A person needs to decide.
+        <p className="mt-2 text-sm leading-relaxed text-text-dim">
+          {receipt.stopping?.explanation ?? "—"}
         </p>
+      </Stage>
 
-        <div className="mt-4 flex flex-col gap-3">
+      <Connector label="Confidence below threshold — escalated" index={1} />
+
+      <Stage
+        role="human"
+        label="Human review required"
+        headline="Awaiting your decision"
+        index={1}
+        trailing={
+          <Badge tone="human">
+            <TriangleAlert aria-hidden className="h-3 w-3" strokeWidth={2.25} />
+            Action needed
+          </Badge>
+        }
+      >
+        {/* Everything the brief requires a reviewer to see *before* they act:
+            the recommendation, the numbers behind it, why it escalated, and
+            how much evidence it rests on. Deciding above the fold without
+            this context is how rubber-stamping happens. */}
+        {receipt.score && (
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-border bg-bg-sunken p-4 sm:grid-cols-4">
+            <Fact label="Score" value={formatScore(receipt.score.value)} />
+            <Fact
+              label="Confidence"
+              value={formatPercent(receipt.score.confidence)}
+              tone="text-human"
+            />
+            <Fact label="Autonomy threshold" value={formatPercent(receipt.score.tau)} />
+            <Fact
+              label="Evidence"
+              value={`${receipt.evidence.items.length} fields`}
+              hint={`${receipt.evidence.unknown_fields.length} unknown`}
+            />
+          </dl>
+        )}
+
+        <div className="mt-5 flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-text-dim">Reviewer</span>
             <input
@@ -130,90 +184,145 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
               className="input"
               placeholder="your name"
             />
+            <span className="text-[0.6875rem] text-text-faint">
+              Recorded on the receipt as the person accountable for this call.
+            </span>
           </label>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-dim">Action</span>
-            <div className="flex gap-2">
-              {ACTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => pickAction(opt.value)}
-                  className={
-                    "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
-                    (action === opt.value
-                      ? opt.tone === "qualify"
-                        ? "border-qualify bg-qualify-dim text-qualify"
-                        : opt.tone === "reject"
-                          ? "border-reject bg-reject-dim text-reject"
-                          : "border-human bg-human-dim text-human"
-                      : "border-border text-text-dim hover:border-border-strong hover:text-text")
-                  }
-                >
-                  {opt.label}
-                </button>
-              ))}
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="mb-1.5 text-xs font-medium text-text-dim">Action</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {ACTIONS.map((opt) => {
+                const on = action === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => pickAction(opt.value)}
+                    aria-pressed={on}
+                    className={clsx(
+                      "rounded-md border px-3 py-2 text-sm font-medium transition-[background-color,border-color,color] duration-[130ms]",
+                      on
+                        ? opt.tone === "qualify"
+                          ? "border-qualify bg-qualify-dim text-qualify"
+                          : opt.tone === "reject"
+                            ? "border-reject bg-reject-dim text-reject"
+                            : "border-human bg-human-dim text-human"
+                        : "border-border-strong text-text-dim hover:border-border-loud hover:text-text",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
-          </div>
+            <p className="mt-1 text-[0.6875rem] text-text-faint">{selected.blurb}</p>
+          </fieldset>
 
-          {notesRequired && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-text-dim">
-                Notes <span className="text-human">* required for edit</span>
-              </span>
-              <textarea
-                value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value);
-                  setArmed(false);
-                }}
-                className="textarea"
-                placeholder="Explain the override — this becomes part of the audit trail."
-              />
-            </label>
-          )}
-          {!notesRequired && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-text-dim">Notes (optional)</span>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="textarea"
-              />
-            </label>
-          )}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-dim">
+              Notes{" "}
+              {notesRequired ? (
+                <span className="text-human">— required for an edit</span>
+              ) : (
+                <span className="text-text-faint">(optional)</span>
+              )}
+            </span>
+            <textarea
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setArmed(false);
+              }}
+              className="textarea"
+              placeholder={
+                notesRequired
+                  ? "Explain the override — this becomes part of the audit trail."
+                  : "Anything worth recording alongside this decision."
+              }
+            />
+          </label>
 
-          {error && (
-            <p className="rounded-lg border border-reject/40 bg-reject-dim px-3 py-2 text-sm text-text">
-              {error}
-            </p>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-start gap-2 rounded-md border border-reject-edge bg-reject-dim px-3 py-2 text-sm text-text"
+              >
+                <CircleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-reject" />
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
 
-          <div className="flex items-center gap-3">
-            <button
+          {/* Two-step arm-then-confirm. The label changes to name the exact
+              action being committed, so the confirming click is never
+              ambiguous about what it approves. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
               type="button"
+              variant={armed ? (action === "reject" ? "danger" : "human") : "secondary"}
               disabled={!canSubmit || submitting}
               onClick={handleSubmitClick}
-              className="rounded-lg bg-human px-4 py-2 text-sm font-semibold text-bg transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50 disabled:hover:scale-100"
             >
-              {submitting ? "Submitting…" : armed ? `Confirm ${action}` : "Submit decision"}
-            </button>
-            {armed && !submitting && (
-              <button
-                type="button"
-                onClick={() => setArmed(false)}
-                className="text-sm text-text-dim underline underline-offset-4 hover:text-text"
-              >
-                Cancel
-              </button>
-            )}
+              {submitting ? (
+                "Submitting…"
+              ) : armed ? (
+                <>
+                  <ShieldCheck className="h-4 w-4" strokeWidth={2.25} />
+                  Confirm {action}
+                </>
+              ) : (
+                "Submit decision"
+              )}
+            </Button>
+            <AnimatePresence>
+              {armed && !submitting && (
+                <motion.div
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-3"
+                >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setArmed(false)}>
+                    Cancel
+                  </Button>
+                  <span className="text-xs text-text-faint">
+                    This is recorded permanently and cannot be undone here.
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </Panel>
+      </Stage>
+    </Chain>
+  );
+}
+
+function Fact({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: string;
+}) {
+  return (
+    <div>
+      <Eyebrow>{label}</Eyebrow>
+      <p className={clsx("t-metric mt-1.5 text-lg", tone ?? "text-text")}>{value}</p>
+      {hint && <p className="mt-0.5 text-[0.6875rem] text-text-faint">{hint}</p>}
     </div>
   );
 }
+
+/* ------------------------------------------------------------- resolved -- */
 
 function ResolvedSequence({
   review,
@@ -224,40 +333,62 @@ function ResolvedSequence({
 }) {
   const finalTone = toneForStatus(receipt.lead_status);
   const note = reviewerNote(review.notes);
+  const finalRole: StageRole =
+    finalTone === "reject" ? "reject" : finalTone === "human" ? "human" : "final";
+
   return (
-    <div className="flex flex-col gap-4">
-      <SequenceStage
+    <Chain>
+      <Stage
         role="machine"
-        title="Machine recommendation"
+        label="Machine recommendation"
         headline={decisionLabel(receipt.decision?.recommended_action ?? "—")}
-      />
-      <Connector />
-      <SequenceStage
+        index={0}
+      >
+        <p className="mt-2 text-sm text-text-faint">
+          What ARIE would have done on its own. Preserved exactly as recommended, whatever happened
+          next.
+        </p>
+      </Stage>
+
+      <Connector label="Escalated to a person" index={1} />
+
+      <Stage
         role="human"
-        title={`Human action — ${review.reviewer ?? "unknown reviewer"}`}
+        label={`Human action — ${review.reviewer ?? "unknown reviewer"}`}
         headline={reviewActionLabel(receiptActionFromReview(review))}
+        index={1}
       >
         {note ? (
-          <p className="mt-2 text-sm text-text-dim">“{note}”</p>
+          <blockquote className="mt-3 border-l-2 border-human-edge pl-3 text-sm leading-relaxed text-text-dim">
+            {note}
+          </blockquote>
         ) : (
           <p className="mt-2 text-sm text-text-faint">No reviewer note</p>
         )}
-      </SequenceStage>
-      <Connector />
-      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}>
-        <SequenceStage
-          role={finalTone === "reject" ? "reject" : "final"}
-          title="Final outcome"
-          headline={statusLabel(receipt.lead_status)}
-        >
-          {receipt.decision?.human_override && (
-            <div className="mt-2">
-              <Badge tone="human">Human override — machine recommended differently</Badge>
-            </div>
-          )}
-        </SequenceStage>
-      </motion.div>
-    </div>
+      </Stage>
+
+      <Connector index={2} />
+
+      <Stage
+        role={finalRole}
+        label="Final outcome"
+        headline={statusLabel(receipt.lead_status)}
+        index={2}
+        trailing={
+          receipt.decision?.human_override ? (
+            <Badge tone="human">Human override</Badge>
+          ) : (
+            <Badge tone="neutral">Recommendation upheld</Badge>
+          )
+        }
+      >
+        <p className="mt-2 text-sm text-text-faint">
+          {receipt.decision?.human_override
+            ? "The reviewer decided differently from ARIE. Both records stand."
+            : "The reviewer agreed with ARIE's recommendation."}
+        </p>
+      </Stage>
+    </Chain>
   );
 }
 
@@ -265,49 +396,4 @@ function receiptActionFromReview(review: ReviewResponse): string {
   if (review.final_decision === "auto_route") return "approve";
   if (review.final_decision === "manual_review") return "edit";
   return "reject";
-}
-
-function SequenceStage({
-  role,
-  title,
-  headline,
-  children,
-}: {
-  role: "machine" | "human" | "final" | "reject";
-  title: string;
-  headline: string;
-  children?: React.ReactNode;
-}) {
-  const border =
-    role === "machine"
-      ? "border-l-machine"
-      : role === "human"
-        ? "border-l-human"
-        : role === "reject"
-          ? "border-l-reject"
-          : "border-l-qualify";
-  const color =
-    role === "machine"
-      ? "text-machine"
-      : role === "human"
-        ? "text-human"
-        : role === "reject"
-          ? "text-reject"
-          : "text-qualify";
-
-  return (
-    <div className={`rounded-xl border border-border border-l-2 ${border} bg-panel p-5`}>
-      <Eyebrow>{title}</Eyebrow>
-      <p className={`mt-1 font-display text-2xl font-medium ${color}`}>{headline}</p>
-      {children}
-    </div>
-  );
-}
-
-function Connector() {
-  return (
-    <div className="flex justify-center">
-      <div className="h-6 w-px bg-border-strong" />
-    </div>
-  );
 }

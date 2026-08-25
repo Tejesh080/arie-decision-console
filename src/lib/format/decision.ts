@@ -18,6 +18,23 @@ export function decisionLabel(decision: string): string {
   return DECISION_LABELS[decision] ?? decision;
 }
 
+/**
+ * Past tense, for the counterfactual phrasing shadow mode needs
+ * ("would have ..."). An explicit table rather than a suffix rule: English
+ * past tense is not a string operation, and deriving it by appending "d"
+ * produced "rejectd" and "escalate to humand" for two of the three real
+ * decision values.
+ */
+const DECISION_PAST_TENSE: Record<string, string> = {
+  auto_route: "auto-routed",
+  escalate_human: "escalated to a human",
+  reject: "rejected",
+};
+
+export function decisionPastTense(decision: string): string {
+  return DECISION_PAST_TENSE[decision] ?? decisionLabel(decision);
+}
+
 const REVIEW_ACTION_LABELS: Record<string, string> = {
   approve: "Approved",
   reject: "Rejected",

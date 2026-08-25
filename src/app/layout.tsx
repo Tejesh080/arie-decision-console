@@ -1,44 +1,48 @@
-import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { AppHeader } from "@/components/AppHeader";
+import { AmbientField } from "@/components/graphics/AmbientField";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+/**
+ * One type family in two voices. Geist for interface text and display,
+ * Geist Mono for every figure, identifier and threshold — the "data voice".
+ * A single family keeps the vertical rhythm consistent between a label and
+ * the number under it, which a sans/mono pairing from two foundries never
+ * quite manages.
+ */
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  axes: ["opsz", "SOFT", "WONK"],
   display: "swap",
 });
 
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
   title: "ARIE — Decision Console",
   description:
-    "Adaptive Revenue Intelligence Engine: submit a lead, watch it move through evidence, scoring, and decision, and see exactly why ARIE stopped where it did.",
+    "Adaptive Revenue Intelligence Engine: ARIE decides whether another provider call is worth making at all, then shows you every reason it stopped where it did.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#08090b",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} h-full`}
-    >
-      <body className="min-h-full flex flex-col relative">
+    <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full`}>
+      <body className="relative flex min-h-full flex-col">
+        <AmbientField />
         <AppHeader />
-        <main className="relative z-0 flex-1">{children}</main>
+        <main id="content" className="relative z-0 flex-1">
+          {children}
+        </main>
       </body>
     </html>
   );

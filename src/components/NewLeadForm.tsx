@@ -2,35 +2,50 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowRight, CircleAlert, Eye, Sparkle } from "lucide-react";
+import clsx from "clsx";
 import { submitLead } from "@/lib/api/leads";
 import { pollLeadUntilSettled } from "@/lib/api/polling";
 import { addRecentLead } from "@/lib/localHistory";
 import { ArieApiError, ArieTimeoutError, ArieValidationError } from "@/lib/api/errors";
 import type { LeadStatus } from "@/lib/api/types";
-import { PROCESSING_SEQUENCE, statusLabel } from "@/lib/format";
 import { Panel, Eyebrow } from "./ui/Panel";
+import { Badge } from "./ui/Badge";
+import { Button } from "./ui/Button";
+import { IdChip } from "./ui/CopyButton";
+import { ProcessingRail } from "./receipt/ProcessingRail";
+import { DURATION, EASE_OUT } from "@/lib/motion";
 
 type FlowState = "idle" | "submitting" | "processing" | "error";
 
 interface Preset {
   label: string;
+  outcome: string;
   email: string;
   full_name: string;
   company_domain: string;
   company_name: string;
 }
 
+/**
+ * Identities from the frozen evaluation corpus. Under
+ * `PROVIDER_MODE=simulated` the corpus is replayed rather than sampled, so
+ * these resolve the same way every time — which is what makes it honest to
+ * name the outcome on the button.
+ */
 const DEMO_PRESETS: Preset[] = [
   {
-    label: "Nadia Delacroix — autonomous",
+    label: "Nadia Delacroix",
+    outcome: "Resolves autonomously",
     email: "nadia.delacroix@lumen500.com",
     full_name: "Nadia Delacroix",
     company_domain: "lumen500.com",
     company_name: "",
   },
   {
-    label: "Nadia Haddad — human escalation",
+    label: "Nadia Haddad",
+    outcome: "Escalates to human review",
     email: "nadia.haddad@cobalt500.com",
     full_name: "Nadia Haddad",
     company_domain: "cobalt500.com",
@@ -44,6 +59,7 @@ function freshExternalRef(): string {
 
 export function NewLeadForm() {
   const router = useRouter();
+  const reduced = useReducedMotion();
 
   const [source, setSource] = useState("arie-web");
   const [email, setEmail] = useState("");
@@ -86,7 +102,17 @@ export function NewLeadForm() {
         setState("processing");
         setCurrentStatus(result.status);
 
-        await pollLeadUntilSettled(result.lead_id, { onUpdate: setCurrentStatus });
+        // 60s rather than the 30s default. The escalation path calls every
+        // provider in the catalogue, several of which are deliberately slow,
+        // and each poll is a proxy round trip to a hosted backend -- against
+        // Railway that legitimately exceeds 30s, which would surface a
+        // timeout for a lead that is processing perfectly normally. The rail
+        // shows real progress throughout, so the wait is never blank, and
+        // the timeout branch still hands over the receipt link.
+        await pollLeadUntilSettled(result.lead_id, {
+          onUpdate: setCurrentStatus,
+          timeoutMs: 60_000,
+        });
 
         addRecentLead({
           lead_id: result.lead_id,
@@ -115,212 +141,284 @@ export function NewLeadForm() {
   const isBusy = state === "submitting" || state === "processing";
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <Panel>
+    <div>
+      <header className="mb-8 max-w-2xl">
         <Eyebrow>New lead</Eyebrow>
-        <h1 className="mt-2 font-display text-2xl font-medium text-text">Submit a lead to ARIE</h1>
-        <p className="mt-2 text-sm text-text-dim">
-          This is the actual <code className="font-data text-xs">POST /leads</code> request body —
-          nothing here is simulated once submitted in API mode.
+        <h1 className="t-h1 mt-2 text-text">Submit a lead to ARIE</h1>
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-text-dim">
+          These fields are the real <code className="t-data text-text-dim">POST /leads</code>{" "}
+          request body. Once submitted, ARIE runs its actual acquisition and scoring pipeline — the
+          progress below reflects genuine state transitions, not a scripted animation.
         </p>
+      </header>
 
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Source" required>
-              <input
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
-                required
-                disabled={isBusy}
-                className="input"
-              />
-            </Field>
-            <Field label="Email" required>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isBusy}
-                placeholder="nadia.delacroix@lumen500.com"
-                className="input"
-              />
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Full name">
-              <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                disabled={isBusy}
-                className="input"
-              />
-            </Field>
-            <Field label="Company domain">
-              <input
-                value={companyDomain}
-                onChange={(e) => setCompanyDomain(e.target.value)}
-                disabled={isBusy}
-                placeholder="lumen500.com"
-                className="input"
-              />
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Company name">
-              <input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                disabled={isBusy}
-                className="input"
-              />
-            </Field>
-            <Field label="External ref" hint="Keeps redelivery idempotent">
-              <input
-                value={externalRef}
-                onChange={(e) => setExternalRef(e.target.value)}
-                disabled={isBusy}
-                className="input font-data text-xs"
-              />
-            </Field>
-          </div>
-
-          <label className="flex items-start gap-2.5 rounded-lg border border-border bg-bg-raised px-3 py-2.5">
-            <input
-              type="checkbox"
-              checked={shadowMode}
-              onChange={(e) => setShadowMode(e.target.checked)}
-              disabled={isBusy}
-              className="mt-0.5 h-4 w-4 accent-shadow"
-            />
-            <span className="text-sm">
-              <span className="font-medium text-text">Shadow mode</span>
-              <span className="block text-xs text-text-faint">
-                ARIE computes its full recommendation but takes no authoritative action — no
-                auto-route, no reject, no human review opened.
-              </span>
-            </span>
-          </label>
-
-          <div className="mt-2 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isBusy}
-              className="rounded-lg bg-machine px-5 py-2.5 text-sm font-semibold text-bg transition-transform hover:scale-[1.02] active:scale-[0.99] disabled:opacity-50 disabled:hover:scale-100"
-            >
-              {isBusy ? "Processing…" : "Submit lead"}
-            </button>
-            {state === "error" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setState("idle");
-                  setError(null);
-                }}
-                className="text-sm text-text-dim underline underline-offset-4 hover:text-text"
-              >
-                Edit and try again
-              </button>
-            )}
-          </div>
-        </form>
-
-        <AnimatePresence>
-          {error && (
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* ------------------------------------------------------------ form */}
+        <AnimatePresence mode="wait" initial={false}>
+          {isBusy ? (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
+              key="processing"
+              initial={reduced ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mt-4 rounded-lg border border-reject/40 bg-reject-dim px-4 py-3 text-sm text-text"
+              exit={reduced ? undefined : { opacity: 0, y: -8 }}
+              transition={{ duration: DURATION.slow, ease: EASE_OUT }}
             >
-              <p>{error}</p>
-              {submittedLeadId && (
-                <p className="mt-2">
-                  <a
-                    href={`/leads/${submittedLeadId}`}
-                    className="text-machine underline underline-offset-4"
-                  >
-                    View its receipt anyway
-                  </a>{" "}
-                  — it may still be processing.
+              <Panel accent={shadowMode ? "shadow" : "machine"} padding="lg">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Eyebrow>{shadowMode ? "Shadow evaluation" : "In flight"}</Eyebrow>
+                    <h2 className="t-h2 mt-2 text-text">{fullName || email}</h2>
+                    {submittedLeadId ? (
+                      <div className="mt-2">
+                        <IdChip value={submittedLeadId} />
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-text-faint">Accepting…</p>
+                    )}
+                  </div>
+                  {shadowMode && (
+                    <Badge tone="shadow" variant="outline">
+                      No routing action
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="mt-7 border-t border-border pt-6">
+                  <ProcessingRail liveStatus={currentStatus} compact />
+                </div>
+
+                <p className="mt-5 text-[0.8125rem] leading-relaxed text-text-faint">
+                  You&apos;ll land on the decision receipt as soon as ARIE settles. Nothing is lost
+                  if you navigate away — the receipt is addressable by lead ID.
                 </p>
-              )}
+              </Panel>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="form"
+              initial={reduced ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={reduced ? undefined : { opacity: 0 }}
+              transition={{ duration: DURATION.base }}
+            >
+              <Panel padding="lg" as="section">
+                <form onSubmit={handleSubmit} className="grid gap-5">
+                  <fieldset className="grid gap-4">
+                    <legend className="sr-only">Lead identity</legend>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Email" required hint="The only field ARIE strictly requires">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          placeholder="nadia.delacroix@lumen500.com"
+                          className="input"
+                        />
+                      </Field>
+                      <Field label="Full name">
+                        <input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="Nadia Delacroix"
+                          className="input"
+                        />
+                      </Field>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field label="Company domain" hint="Drives firmographic lookups">
+                        <input
+                          value={companyDomain}
+                          onChange={(e) => setCompanyDomain(e.target.value)}
+                          placeholder="lumen500.com"
+                          className="input"
+                        />
+                      </Field>
+                      <Field label="Company name">
+                        <input
+                          value={companyName}
+                          onChange={(e) => setCompanyName(e.target.value)}
+                          className="input"
+                        />
+                      </Field>
+                    </div>
+                  </fieldset>
+
+                  <fieldset className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+                    <legend className="sr-only">Delivery metadata</legend>
+                    <Field label="Source" required>
+                      <input
+                        value={source}
+                        onChange={(e) => setSource(e.target.value)}
+                        required
+                        className="input"
+                      />
+                    </Field>
+                    <Field label="External ref" hint="Keeps redelivery idempotent">
+                      <input
+                        value={externalRef}
+                        onChange={(e) => setExternalRef(e.target.value)}
+                        className="input t-data"
+                      />
+                    </Field>
+                  </fieldset>
+
+                  <ShadowToggle checked={shadowMode} onChange={setShadowMode} />
+
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={reduced ? false : { opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="rounded-md border border-reject-edge bg-reject-dim px-4 py-3 text-sm text-text"
+                      >
+                        <p className="flex items-start gap-2">
+                          <CircleAlert
+                            aria-hidden
+                            className="mt-0.5 h-4 w-4 shrink-0 text-reject"
+                            strokeWidth={2.25}
+                          />
+                          {error}
+                        </p>
+                        {submittedLeadId && (
+                          <p className="mt-2 pl-6 text-text-dim">
+                            ARIE accepted the lead before this failed —{" "}
+                            <a
+                              href={`/leads/${submittedLeadId}`}
+                              className="text-machine underline underline-offset-4"
+                            >
+                              open its receipt
+                            </a>
+                            ; it may still be processing.
+                          </p>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
+                    <Button
+                      type="submit"
+                      variant={shadowMode ? "secondary" : "primary"}
+                      size="lg"
+                      disabled={isBusy}
+                    >
+                      {shadowMode ? "Evaluate in shadow" : "Submit lead"}
+                      <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+                    </Button>
+                    {state === "error" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setState("idle");
+                          setError(null);
+                        }}
+                      >
+                        Reset
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </Panel>
             </motion.div>
           )}
         </AnimatePresence>
-      </Panel>
 
-      <div className="flex flex-col gap-6">
-        <Panel>
-          <Eyebrow>Try a deterministic identity</Eyebrow>
-          <div className="mt-3 flex flex-col gap-2">
-            {DEMO_PRESETS.map((preset) => (
-              <button
-                key={preset.email}
-                type="button"
-                disabled={isBusy}
-                onClick={() => applyPreset(preset)}
-                className="rounded-lg border border-border px-3 py-2 text-left text-sm text-text-dim transition-colors hover:border-border-strong hover:text-text disabled:opacity-50"
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-text-faint">
-            Fills the form from the frozen demo corpus. Each use generates a fresh external
-            reference so it always creates a new run.
-          </p>
-        </Panel>
-
-        <AnimatePresence>{isBusy && <ProcessingPanel status={currentStatus} />}</AnimatePresence>
+        {/* --------------------------------------------------------- presets */}
+        <aside className="flex flex-col gap-5">
+          <Panel padding="sm">
+            <Eyebrow>Deterministic identities</Eyebrow>
+            <div className="mt-3 flex flex-col gap-2">
+              {DEMO_PRESETS.map((preset) => (
+                <button
+                  key={preset.email}
+                  type="button"
+                  disabled={isBusy}
+                  onClick={() => applyPreset(preset)}
+                  className="group rounded-md border border-border bg-bg-sunken p-3 text-left transition-[border-color,background-color] duration-[130ms] hover:border-border-loud hover:bg-surface-2 disabled:opacity-50"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-text">{preset.label}</span>
+                    <Sparkle
+                      aria-hidden
+                      className="h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition-opacity group-hover:opacity-100"
+                      strokeWidth={2}
+                    />
+                  </span>
+                  <span className="t-data mt-1 block truncate text-text-faint">{preset.email}</span>
+                  <span className="mt-2 block text-xs text-text-dim">{preset.outcome}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-[0.6875rem] leading-relaxed text-text-faint">
+              Fills the form from the frozen evaluation corpus, which replays identically every run.
+              Each click generates a fresh external reference, so it always creates a new lead
+              rather than returning the previous one.
+            </p>
+          </Panel>
+        </aside>
       </div>
     </div>
   );
 }
 
-function ProcessingPanel({ status }: { status: LeadStatus | null }) {
-  const currentIndex = status ? PROCESSING_SEQUENCE.indexOf(status) : -1;
-  const isBranched = status !== null && currentIndex === -1;
-
+/** A switch, not a checkbox — shadow mode changes what submitting *means*,
+ * so it deserves a control with weight and an explanation attached. */
+function ShadowToggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-      <Panel accent="machine">
-        <Eyebrow>Live status</Eyebrow>
-        <ol className="mt-3 flex flex-col gap-2.5">
-          {PROCESSING_SEQUENCE.map((stage, index) => {
-            const done = currentIndex > index || isBranched;
-            const active = currentIndex === index;
-            return (
-              <li key={stage} className="flex items-center gap-2.5 text-sm">
-                <span
-                  className={
-                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[0.65rem] " +
-                    (done
-                      ? "border-machine bg-machine text-bg"
-                      : active
-                        ? "border-machine text-machine"
-                        : "border-border-strong text-text-faint")
-                  }
-                >
-                  {done ? "✓" : index + 1}
-                </span>
-                <span className={done || active ? "text-text" : "text-text-faint"}>
-                  {statusLabel(stage)}
-                </span>
-                {active && (
-                  <span className="ml-auto h-1.5 w-1.5 animate-pulse rounded-full bg-machine" />
-                )}
-              </li>
-            );
-          })}
-        </ol>
-        {isBranched && status && (
-          <p className="mt-4 rounded-lg bg-panel-2 px-3 py-2 text-sm text-text">
-            {statusLabel(status)} — redirecting to the receipt…
-          </p>
-        )}
-      </Panel>
-    </motion.div>
+    <div
+      className={clsx(
+        "rounded-md border p-4 transition-colors duration-200",
+        checked ? "border-shadow-edge bg-shadow-dim/40" : "border-border bg-bg-sunken",
+      )}
+    >
+      <label className="flex cursor-pointer items-start gap-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          onClick={() => onChange(!checked)}
+          className={clsx(
+            "relative mt-0.5 h-5 w-9 shrink-0 rounded-full border transition-colors duration-200",
+            checked ? "border-shadow-edge bg-shadow-role/30" : "border-border-strong bg-surface-2",
+          )}
+        >
+          <span className="sr-only">Shadow mode</span>
+          <motion.span
+            layout
+            transition={{ type: "spring", stiffness: 520, damping: 34 }}
+            className={clsx(
+              "absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full",
+              checked ? "left-[1.125rem] bg-shadow-role" : "left-0.5 bg-text-faint",
+            )}
+          />
+        </button>
+        <span className="min-w-0">
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-medium text-text">Shadow mode</span>
+            {checked && (
+              <Badge tone="shadow" variant="outline" size="sm">
+                <Eye aria-hidden className="h-3 w-3" strokeWidth={2.25} />
+                Observational
+              </Badge>
+            )}
+          </span>
+          <span className="mt-1 block text-xs leading-relaxed text-text-faint">
+            ARIE computes its full recommendation, score and confidence, but takes no authoritative
+            action — nothing is routed, nothing is rejected, and no human review is opened. The
+            receipt records what it <em>would</em> have done.
+          </span>
+        </span>
+      </label>
+    </div>
   );
 }
 
@@ -336,13 +434,19 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
+    <label className="flex min-w-0 flex-col gap-1.5">
       <span className="text-xs font-medium text-text-dim">
         {label}
-        {required && <span className="text-human"> *</span>}
+        {required && (
+          <span className="text-human" aria-hidden>
+            {" "}
+            *
+          </span>
+        )}
+        {required && <span className="sr-only"> (required)</span>}
       </span>
       {children}
-      {hint && <span className="text-[0.7rem] text-text-faint">{hint}</span>}
+      {hint && <span className="text-[0.6875rem] text-text-faint">{hint}</span>}
     </label>
   );
 }

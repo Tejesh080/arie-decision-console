@@ -1,17 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import clsx from "clsx";
 import { getDataMode } from "@/lib/api/mode";
 import { getHealth } from "@/lib/api/health";
 import type { HealthResponse } from "@/lib/api/types";
-import { Badge } from "./ui/Badge";
 
 /**
- * A restrained status line, not an observability dashboard. Polls
- * `GET /healthz` (through the proxy) at a slow, fixed interval — never on
- * every render, never sub-second.
+ * Telemetry, not an alert. Polls `GET /healthz` (through the proxy) at a
+ * slow fixed interval — never on every render, never sub-second.
+ *
+ * Renders as a status *light*: a dot plus a label that collapses to just
+ * the dot on narrow screens, so backend state stays visible on mobile
+ * instead of being hidden the moment room gets tight. The accessible name
+ * carries the full sentence at every width.
  */
 const POLL_INTERVAL_MS = 30_000;
+
+type Look = {
+  dot: string;
+  text: string;
+  ring: string;
+  label: string;
+  pulse: boolean;
+};
 
 export function ConnectionStatus() {
   const mode = getDataMode();
@@ -34,37 +46,69 @@ export function ConnectionStatus() {
     };
   }, [mode]);
 
-  if (mode === "mock") {
-    return (
-      <Badge tone="human">
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        Mock mode
-      </Badge>
-    );
-  }
-
-  if (health === null) {
-    return (
-      <Badge tone="pending">
-        <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-        Checking ARIE backend…
-      </Badge>
-    );
-  }
-
-  if (health.status === "ok") {
-    return (
-      <Badge tone="qualify">
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        ARIE backend connected
-      </Badge>
-    );
-  }
+  const look = resolveLook(mode, health);
 
   return (
-    <Badge tone="reject">
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {health.status === "degraded" ? "ARIE backend degraded" : "ARIE backend unavailable"}
-    </Badge>
+    <span
+      className={clsx(
+        "inline-flex items-center gap-2 rounded-full border px-2 py-1 sm:px-2.5",
+        "bg-surface/70 backdrop-blur-sm",
+        look.ring,
+      )}
+      title={look.label}
+    >
+      <span className="relative flex h-1.5 w-1.5 shrink-0">
+        {look.pulse && <span className={clsx("absolute inset-0 rounded-full breathe", look.dot)} />}
+        <span className={clsx("h-1.5 w-1.5 rounded-full", look.dot)} />
+      </span>
+      <span className={clsx("t-label hidden lg:inline", look.text)}>{look.label}</span>
+      <span className="sr-only lg:hidden">{look.label}</span>
+    </span>
   );
+}
+
+function resolveLook(mode: "mock" | "api", health: HealthResponse | null): Look {
+  if (mode === "mock") {
+    return {
+      dot: "bg-human",
+      text: "text-human",
+      ring: "border-human-edge",
+      label: "Mock data",
+      pulse: false,
+    };
+  }
+  if (health === null) {
+    return {
+      dot: "bg-pending",
+      text: "text-pending",
+      ring: "border-border-strong",
+      label: "Connecting",
+      pulse: true,
+    };
+  }
+  if (health.status === "ok") {
+    return {
+      dot: "bg-qualify",
+      text: "text-qualify",
+      ring: "border-qualify-edge",
+      label: "Backend live",
+      pulse: false,
+    };
+  }
+  if (health.status === "degraded") {
+    return {
+      dot: "bg-human",
+      text: "text-human",
+      ring: "border-human-edge",
+      label: "Backend degraded",
+      pulse: true,
+    };
+  }
+  return {
+    dot: "bg-reject",
+    text: "text-reject",
+    ring: "border-reject-edge",
+    label: "Backend down",
+    pulse: false,
+  };
 }

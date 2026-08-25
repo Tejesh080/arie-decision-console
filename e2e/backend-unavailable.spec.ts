@@ -19,7 +19,7 @@ test("backend unavailable renders a clear, non-blank error state", async ({ page
   );
 
   await page.goto("/leads/new");
-  await page.getByRole("button", { name: "Nadia Delacroix — autonomous" }).click();
+  await page.getByRole("button", { name: /Nadia Delacroix/ }).click();
   await page.getByRole("button", { name: "Submit lead" }).click();
 
   // Matches in more than one place on purpose (header connection badge +
@@ -48,5 +48,5 @@ test("a receipt page for an unreachable backend also shows a clear error, not a 
   await expect(
     page.getByText(/ARIE backend unavailable|Could not reach the ARIE backend/).first(),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 });
