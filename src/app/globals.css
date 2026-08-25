@@ -193,8 +193,14 @@ body::before {
 }
 
 /* One focus ring for every interactive element that isn't a text field.
-   Keyboard-only: pointer users never see it, keyboard users always do. */
-:where(a, button, [role="button"], summary, input[type="checkbox"]):focus-visible {
+   Keyboard-only: pointer users never see it, keyboard users always do.
+
+   Written with `:is()` rather than `:where()` on purpose. `:where()`
+   contributes zero specificity, so the user-agent's own :focus-visible rule
+   won the `outline-color` cascade and every ring was painted in
+   currentColor -- visible, but a different colour on each control instead of
+   the one accent. */
+:is(a, button, [role="button"], [role="switch"], summary, input[type="checkbox"]):focus-visible {
   outline: 2px solid var(--machine);
   outline-offset: 2px;
   border-radius: var(--r-sm);
