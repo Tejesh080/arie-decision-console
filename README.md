@@ -154,8 +154,8 @@ The app is a stateless Next.js frontend with one server-side dependency: the ARI
 1. [Import this repo](https://vercel.com/new) into Vercel. Framework preset (Next.js) and build settings are auto-detected — leave them as-is.
 2. Add one environment variable:
 
-   | Name                            | Value                                                                                                                                                |
-   | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | Name                            | Value                                                                                                                                      |
+   | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
    | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/arie-b2b-enrichment-engine#hosted-deployment) |
 
    Optionally also set `NEXT_PUBLIC_ARIE_PROVIDER_MODE` to `live` if — and only if — the backend it points at runs with `PROVIDER_MODE=live`. It changes nothing but wording: it is what makes the UI say "provider cost" instead of "modelled provider cost". Leave it unset for the hosted demo, which runs simulated.

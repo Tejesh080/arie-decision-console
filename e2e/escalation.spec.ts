@@ -13,24 +13,29 @@ test("escalation scenario: human review required, approve preserves the full seq
   page,
 }) => {
   await page.goto("/leads/new");
-  await page.getByRole("button", { name: /Nadia Haddad/ }).click();
-  await page.getByRole("button", { name: "Submit lead" }).click();
+  // One click: the example runs itself; the receipt page shows processing.
+  await page.getByRole("button", { name: /Asks a human/ }).click();
 
-  await page.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 75_000 });
+  await page.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   const receiptUrl = page.url();
 
   // --- Scenario B: pending review, machine recommendation visible first ---
-  await expect(page.getByText("Awaiting human review", { exact: true })).toBeVisible();
+  // The page arrives mid-processing and polls to the escalated state.
+  await expect(page.getByText("Awaiting human review", { exact: true })).toBeVisible({
+    timeout: 75_000,
+  });
   await expect(page.getByText("Machine recommendation")).toBeVisible();
   await expect(page.getByRole("button", { name: "Reject", exact: true })).toBeVisible();
   // The escalation framing has to say why nobody could act on it alone.
   await expect(page.getByText(/was not confident enough to act on that alone/)).toBeVisible();
   // Stated twice on purpose: once in the verdict figures, once in the
   // reviewer's own decision context.
-  await expect(page.getByText("Autonomy threshold", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Automation threshold", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Human review required")).toBeVisible();
 
-  // Approve through the UI (two-step confirm, no modal).
+  // Approve through the UI (two-step confirm, no modal). A reviewer name is
+  // required first -- the field no longer defaults to a machine identifier.
+  await page.getByPlaceholder(/Your name/).fill("jane");
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await page.getByRole("button", { name: "Submit decision" }).click();
   await page.getByRole("button", { name: "Confirm approve" }).click();

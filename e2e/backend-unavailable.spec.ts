@@ -19,18 +19,20 @@ test("backend unavailable renders a clear, non-blank error state", async ({ page
   );
 
   await page.goto("/leads/new");
-  await page.getByRole("button", { name: /Nadia Delacroix/ }).click();
-  await page.getByRole("button", { name: "Submit lead" }).click();
+  await page.getByLabel(/Email/).fill("probe@unreachable.example");
+  await page.getByRole("button", { name: "Evaluate lead" }).click();
 
-  // Matches in more than one place on purpose (header connection badge +
-  // the page's own error panel) -- .first() just confirms at least one is
-  // showing; both being present is a feature, not ambiguity to resolve.
+  // The friendly failure line, with the raw cause behind Technical details.
   await expect(
-    page.getByText(/ARIE backend unavailable|Could not reach the ARIE backend/).first(),
-  ).toBeVisible({ timeout: 15_000 });
+    page
+      .getByText(/didn't respond|ARIE backend unavailable|Could not reach the ARIE backend/)
+      .first(),
+  ).toBeVisible({ timeout: 35_000 });
 
-  // The page must still be usable -- not blank, not a raw stack trace.
-  await expect(page.getByRole("heading", { name: "Submit a lead to ARIE" })).toBeVisible();
+  // The page must still be usable -- not blank, not a raw stack trace --
+  // and retrying must be offered.
+  await expect(page.getByRole("heading", { name: "Evaluate a lead" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Try again/ })).toBeVisible();
 });
 
 test("a receipt page for an unreachable backend also shows a clear error, not a blank page", async ({

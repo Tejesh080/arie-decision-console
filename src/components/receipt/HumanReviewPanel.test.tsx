@@ -109,7 +109,12 @@ describe("HumanReviewPanel — pending review", () => {
       />,
     );
 
+    // A reviewer name is required — the field no longer defaults to the
+    // machine source identifier.
     const submit = screen.getByRole("button", { name: "Submit decision" });
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByPlaceholderText(/Your name/), "jane");
+
     await user.click(submit);
     expect(submitReviewDecisionMock).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Confirm approve" })).toBeInTheDocument();
@@ -118,7 +123,7 @@ describe("HumanReviewPanel — pending review", () => {
     await waitFor(() => expect(submitReviewDecisionMock).toHaveBeenCalledTimes(1));
     expect(submitReviewDecisionMock).toHaveBeenCalledWith(
       "review-1",
-      expect.objectContaining({ action: "approve", expected_lead_version: 3 }),
+      expect.objectContaining({ action: "approve", reviewer: "jane", expected_lead_version: 3 }),
     );
     await waitFor(() => expect(onDecided).toHaveBeenCalled());
   });
@@ -134,6 +139,7 @@ describe("HumanReviewPanel — pending review", () => {
       />,
     );
 
+    await user.type(screen.getByPlaceholderText(/Your name/), "jane");
     await user.click(screen.getByRole("button", { name: "Edit" }));
     const submit = screen.getByRole("button", { name: "Submit decision" });
     expect(submit).toBeDisabled();
@@ -158,6 +164,7 @@ describe("HumanReviewPanel — pending review", () => {
       />,
     );
 
+    await user.type(screen.getByPlaceholderText(/Your name/), "jane");
     await user.click(screen.getByRole("button", { name: "Submit decision" }));
     await user.click(screen.getByRole("button", { name: "Confirm approve" }));
 

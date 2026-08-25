@@ -15,7 +15,15 @@ import { NextResponse } from "next/server";
  */
 
 const DEFAULT_BASE_URL = "http://localhost:8000";
-const PROXY_TIMEOUT_MS = 15_000;
+
+/**
+ * Must stay comfortably below the route handlers' exported `maxDuration`
+ * (30s): if the platform kills the function before this abort fires, the
+ * caller gets an unshaped platform 500 instead of the JSON 502 below — which
+ * is exactly the "ARIE request failed (500)" a slow backend used to produce
+ * under Vercel's 10s default duration.
+ */
+const PROXY_TIMEOUT_MS = 25_000;
 
 function backendBaseUrl(): string {
   return process.env.NEXT_PUBLIC_ARIE_API_BASE_URL?.trim() || DEFAULT_BASE_URL;

@@ -200,7 +200,9 @@ for (const viewport of VIEWPORTS) {
     await page.goto("/");
     await page.evaluate(seedHistory, fixtures);
     await page.reload();
-    await expect(page.getByRole("heading", { level: 2, name: "Recent activity" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Recent demo activity" }),
+    ).toBeVisible();
     // Each card resolves its own status and cost with a live per-lead fetch.
     // Shooting before those land captures skeleton pills and zeroed counters.
     await expect(page.getByText("Auto-routed").first()).toBeVisible({ timeout: 25_000 });

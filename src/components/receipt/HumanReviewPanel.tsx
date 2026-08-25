@@ -36,7 +36,7 @@ const ACTIONS: {
     value: "approve",
     label: "Approve",
     tone: "qualify",
-    blurb: "Accept ARIE's recommendation and let it route.",
+    blurb: "Accept ARIE's recommendation and let it act on it.",
   },
   {
     value: "reject",
@@ -69,7 +69,10 @@ export function HumanReviewPanel({ review, receipt, onDecided, onConflict }: Pro
 /* -------------------------------------------------------------- pending -- */
 
 function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
-  const [reviewer, setReviewer] = useState("arie-web");
+  // Deliberately empty: the old default was the literal source identifier
+  // "arie-web", which then rendered as "Human action — arie-web" on real
+  // receipts — a machine name standing where accountability belongs.
+  const [reviewer, setReviewer] = useState("");
   const [action, setAction] = useState<ReviewAction>("approve");
   const [notes, setNotes] = useState("");
   const [armed, setArmed] = useState(false);
@@ -151,10 +154,29 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
           </Badge>
         }
       >
-        {/* Everything the brief requires a reviewer to see *before* they act:
-            the recommendation, the numbers behind it, why it escalated, and
-            how much evidence it rests on. Deciding above the fold without
-            this context is how rubber-stamping happens. */}
+        {/* Everything a reviewer must see *before* they act: why they are
+            being asked, the recommendation, the numbers behind it, and how
+            much evidence it rests on. Deciding above the fold without this
+            context is how rubber-stamping happens. */}
+        {receipt.score && (
+          <p className="mt-3 text-sm leading-relaxed text-text-dim">
+            You&apos;re being asked because ARIE&apos;s confidence (
+            {formatPercent(receipt.score.confidence)}) fell short of the{" "}
+            {formatPercent(receipt.score.tau)} it needs to act alone
+            {receipt.evidence.unknown_fields.length > 0 && (
+              <>
+                {" "}
+                — {receipt.evidence.unknown_fields.length} field
+                {receipt.evidence.unknown_fields.length === 1
+                  ? " it wanted is"
+                  : "s it wanted are"}{" "}
+                still unknown
+              </>
+            )}
+            . Its recommendation is preserved below either way; your decision is what actually
+            happens.
+          </p>
+        )}
         {receipt.score && (
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 rounded-md border border-border bg-bg-sunken p-4 sm:grid-cols-4">
             <Fact label="Score" value={formatScore(receipt.score.value)} />
@@ -163,7 +185,7 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
               value={formatPercent(receipt.score.confidence)}
               tone="text-human"
             />
-            <Fact label="Autonomy threshold" value={formatPercent(receipt.score.tau)} />
+            <Fact label="Automation threshold" value={formatPercent(receipt.score.tau)} />
             <Fact
               label="Evidence"
               value={`${receipt.evidence.items.length} fields`}
@@ -182,7 +204,7 @@ function PendingReviewForm({ review, receipt, onDecided, onConflict }: Props) {
                 setArmed(false);
               }}
               className="input"
-              placeholder="your name"
+              placeholder="Your name — required"
             />
             <span className="text-[0.6875rem] text-text-faint">
               Recorded on the receipt as the person accountable for this call.

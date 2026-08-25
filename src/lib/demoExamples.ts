@@ -69,8 +69,14 @@ export function findExample(id: string | null | undefined): DemoExample | undefi
   return DEMO_EXAMPLES.find((e) => e.id === id);
 }
 
-/** A fresh reference per run, so an example always creates a new lead rather
- * than returning the previous one through ARIE's own idempotency. */
+/**
+ * A fresh delivery reference per logical submission, so a run always creates
+ * a new lead rather than returning a previous one through ARIE's own
+ * idempotency on (source, external_ref). Never shown to or typed by users —
+ * it identifies a delivery, not a person, and inventing one is the
+ * machine's job (`crypto.randomUUID`, collision-proof where the old
+ * timestamp+Math.random scheme was merely collision-unlikely).
+ */
 export function freshExternalRef(prefix = "web"): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  return `${prefix}-${crypto.randomUUID()}`;
 }

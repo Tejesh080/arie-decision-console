@@ -5,7 +5,11 @@ import type { IngestLeadRequest, IngestLeadResponse, LeadResponse } from "./type
 
 export async function submitLead(input: IngestLeadRequest): Promise<IngestLeadResponse> {
   if (getDataMode() === "mock") return mockStore.createLead(input);
-  return apiClient.post<IngestLeadResponse>("/leads", input);
+  // 28s, above the transport default: a submit against a cold hosted backend
+  // can legitimately take tens of seconds, and the proxy route holds the
+  // request open for up to 25s (see server/proxy.ts) — this must outlast it,
+  // or the client aborts a POST the backend then completes anyway.
+  return apiClient.post<IngestLeadResponse>("/leads", input, { timeoutMs: 28_000 });
 }
 
 export async function getLead(leadId: string): Promise<LeadResponse> {

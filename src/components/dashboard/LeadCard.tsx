@@ -40,7 +40,9 @@ export function LeadCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-[0.9375rem] font-medium text-text">{entry.label}</p>
-            <p className="t-data mt-0.5 truncate text-text-faint">{entry.email}</p>
+            <p className="mt-0.5 truncate text-xs text-text-dim">
+              {entry.company ? entry.company : <span className="t-data">{entry.email}</span>}
+            </p>
           </div>
           <ArrowUpRight
             aria-hidden
@@ -62,6 +64,16 @@ export function LeadCard({
             <Badge tone="shadow" variant="outline" size="sm">
               Shadow
             </Badge>
+          )}
+          {/* Snapshot written when this browser last saw the decided receipt.
+              Display-only; the live StatusPill above never defers to it. */}
+          {entry.confidence !== undefined && (
+            <span
+              className="t-data text-[0.6875rem] text-text-faint"
+              title="ARIE's confidence when it decided"
+            >
+              {(entry.confidence * 100).toFixed(1)}% confident
+            </span>
           )}
         </div>
 

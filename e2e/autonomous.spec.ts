@@ -8,14 +8,16 @@ import { expect, test } from "@playwright/test";
  */
 test("autonomous scenario: Nadia Delacroix reaches an autonomous decision", async ({ page }) => {
   await page.goto("/leads/new");
-  await page.getByRole("button", { name: /Nadia Delacroix/ }).click();
-  await page.getByRole("button", { name: "Submit lead" }).click();
+  // One click: the example runs itself; the receipt page shows processing.
+  await page.getByRole("button", { name: /Decides on its own/ }).click();
 
   await page.waitForURL(/\/leads\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 
   // "Auto-routed" now appears twice on purpose: the status pill, and the
   // verdict prose naming the final status. Both are expected.
-  await expect(page.getByText("Auto-routed", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Auto-routed", { exact: true }).first()).toBeVisible({
+    timeout: 45_000,
+  });
   // The receipt reads in a fixed order, and each part has to be present:
   // what happened, why it stopped buying, and what that used.
   await expect(page.getByText("What happened", { exact: true })).toBeVisible();
@@ -38,6 +40,9 @@ test("autonomous scenario: Nadia Delacroix reaches an autonomous decision", asyn
 
   // The receipt renders real evidence and score data, not a placeholder.
   await expect(page.getByRole("heading", { name: "Where the score landed" })).toBeVisible();
+  // The full ledger sits behind a collapsed Evidence section by default --
+  // the verdict's "What it used" line carries the counts for the first read.
+  await page.getByText("Every check ARIE made", { exact: false }).click();
   await expect(page.getByRole("heading", { name: "Provider ledger" })).toBeVisible();
   await expect(page.getByText(/Fresh calls \(\d+\)/)).toBeVisible();
   // Provider outcome is load-bearing: a call that returned nothing must not

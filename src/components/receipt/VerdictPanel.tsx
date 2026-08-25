@@ -121,21 +121,21 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
         <Figure
           label="Score"
           value={formatScore(score.value)}
-          meaning={`${formatScore(score.threshold_qualify)} or above qualifies`}
+          meaning={`how strong the lead looks — ${formatScore(score.threshold_qualify)}+ qualifies`}
         />
         <Figure
           label="Confidence"
           value={formatPercent(score.confidence)}
           tone={shadow ? "text-shadow-role" : cleared ? "text-qualify" : "text-human"}
-          meaning="how sure ARIE was in this answer"
+          meaning="how sure ARIE is this answer wouldn't change with more data"
         />
         <Figure
-          label="Autonomy threshold"
+          label="Automation threshold"
           value={formatPercent(score.tau)}
           meaning={
             cleared
-              ? `cleared it by ${gap.toFixed(1)} points`
-              : `missed it by ${gap.toFixed(1)} points`
+              ? `confidence needed to act without a human — cleared by ${gap.toFixed(1)} pts`
+              : `confidence needed to act without a human — missed by ${gap.toFixed(1)} pts`
           }
         />
         <Figure
@@ -155,11 +155,7 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
         <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-text">{stopping.explanation}</p>
         <p className="mt-2 text-[0.8125rem] leading-relaxed text-text-faint">
           Every provider call costs money, so ARIE only keeps buying while the next one could still
-          change the answer.{" "}
-          <code className="t-data rounded border border-border bg-bg-sunken px-1.5 py-0.5">
-            {stopping.reason_code}
-          </code>{" "}
-          is the rule that fired.
+          change the answer.
         </p>
       </div>
 
@@ -170,14 +166,14 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
           {cached > 0 && (
             <>
               <strong className="font-medium">{cached}</strong> signal{cached === 1 ? "" : "s"}{" "}
-              already cached from earlier leads
+              already available from earlier checks
               {fresh > 0 ? ", " : " — nothing new had to be bought"}
             </>
           )}
           {fresh > 0 && (
             <>
               {cached > 0 ? "and " : ""}
-              <strong className="font-medium">{fresh}</strong> new provider call
+              <strong className="font-medium">{fresh}</strong> new check
               {fresh === 1 ? "" : "s"}
             </>
           )}
@@ -192,6 +188,13 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
           )}
           {cached === 0 && fresh === 0 && "No provider was reached before ARIE stopped."}
         </p>
+        {fresh > 0 && Number(receipt.cost.provider_cost_usd) === 0 && (
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-text-dim">
+            The new checks happened to be no-charge lookups (some providers, like an internal CRM or
+            a DNS query, bill nothing — others charge only when they find something), which is why
+            fresh checks still cost $0 here.
+          </p>
+        )}
         <p className="mt-2 text-[0.8125rem] leading-relaxed text-text-faint">{costCaveat()}</p>
       </div>
     </Panel>

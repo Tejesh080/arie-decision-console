@@ -114,11 +114,11 @@ export default function DashboardPage() {
 
           <motion.div variants={variants} className="mt-8 flex flex-wrap items-center gap-3">
             <ButtonLink href="/leads/new?run=autonomous" variant="primary" size="lg">
-              Run a demo lead
+              Run the demo
               <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
             </ButtonLink>
             <ButtonLink href="/leads/new" variant="secondary" size="lg">
-              Submit your own
+              Evaluate your own lead
             </ButtonLink>
             {mode === "mock" && <Badge tone="human">Mock mode — no backend required</Badge>}
           </motion.div>
@@ -159,10 +159,10 @@ export default function DashboardPage() {
               </Badge>
             </div>
             <p className="mt-1.5 max-w-xl text-sm text-text-faint">
-              Just the leads <em>you</em> ran, remembered locally so you can find your way back to a
-              receipt. It is not ARIE&apos;s dataset and an empty list here does not mean an empty
-              system — the backend exposes no endpoint to list leads globally, so no page could
-              honestly show one. Each card&apos;s status and cost is fetched live.
+              Just the leads <em>you</em> ran, remembered by this browser so you can find your way
+              back to a receipt. It isn&apos;t ARIE&apos;s dataset — other people&apos;s leads never
+              appear here, and an empty list doesn&apos;t mean an empty system. Each card&apos;s
+              status is fetched live.
             </p>
           </div>
 

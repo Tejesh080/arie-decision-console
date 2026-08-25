@@ -21,7 +21,7 @@ import {
   ArieUnavailableError,
 } from "@/lib/api/errors";
 import type { LeadStatus, ReceiptResponse, ReviewResponse } from "@/lib/api/types";
-import { getRecentLeads } from "@/lib/localHistory";
+import { getRecentLeads, updateRecentLead } from "@/lib/localHistory";
 import { formatDateTime, formatUsd, statusLabel } from "@/lib/format";
 import { costNoun, costCaveat, isSimulated } from "@/lib/api/providerMode";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -59,8 +59,13 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
       setState("ready");
 
       if (current.status === "pending") {
+        // 90s, not the polling default: arriving here straight from submit is
+        // now the normal flow, and the slowest honest path (an escalation that
+        // calls every provider, over the hosted backend) legitimately takes
+        // most of a minute. The rail shows live status the whole time, and
+        // the timeout branch keeps a working "check again".
         try {
-          await pollLeadUntilSettled(leadId, { timeoutMs: 20_000, onUpdate: setLiveStatus });
+          await pollLeadUntilSettled(leadId, { timeoutMs: 90_000, onUpdate: setLiveStatus });
           current = await getReceipt(leadId);
           setReceipt(current);
         } catch (err) {
@@ -70,6 +75,17 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
             throw err;
           }
         }
+      }
+
+      if (current.status === "decided" && current.score) {
+        // Attach the outcome to this browser's local history entry, so the
+        // Recent activity card can answer "what happened?" without a
+        // per-card receipt fetch. Display-only; live status still wins.
+        updateRecentLead(leadId, {
+          outcome: statusLabel(current.lead_status),
+          confidence: current.score.confidence,
+          is_shadow: current.shadow,
+        });
       }
 
       if (current.human_review) {
@@ -151,17 +167,21 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
         <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
           <div className="min-w-0">
             <Eyebrow>Decision receipt</Eyebrow>
-            <h1 className="t-h1 mt-1.5 min-w-0 text-text">
+            <h1 className="t-h1 mt-1.5 min-w-0 break-words text-text">
               {localLabel?.label ?? (
                 <>
                   Lead <span className="t-metric">{leadId.slice(0, 8)}</span>
                 </>
               )}
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <IdChip value={leadId} />
-              {localLabel && (
-                <span className="text-xs text-text-faint">submitted from this browser</span>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-faint">
+              {localLabel?.email && <span className="t-data">{localLabel.email}</span>}
+              {localLabel ? (
+                <span>submitted from this browser</span>
+              ) : (
+                // Not in this browser's history — the ID is the only identity
+                // available, so it stays up here for that case alone.
+                <IdChip value={leadId} />
               )}
             </div>
           </div>
@@ -189,14 +209,32 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
 
       {receipt.status === "processing_failed" && (
         <Panel accent="reject">
-          <Eyebrow>Processing failed</Eyebrow>
-          <h2 className="t-h3 mt-1.5 text-text">ARIE never reached a decision</h2>
+          <Eyebrow>Couldn&apos;t evaluate</Eyebrow>
+          <h2 className="t-h3 mt-1.5 text-text">ARIE never reached a decision on this lead</h2>
           <p className="mt-2 text-sm leading-relaxed text-text-dim">
-            This lead was dead-lettered before a decision was made and will not resolve on its own.
-            Current status:{" "}
-            <strong className="text-text">{statusLabel(receipt.lead_status)}</strong>. There is no
-            score, confidence or stopping reason to show, because none was ever computed.
+            Processing failed permanently, so there is no score, confidence, or stopping reason to
+            show — none was ever computed. This lead won&apos;t resolve on its own; submitting it
+            again creates a fresh evaluation.
           </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <ButtonLink href="/leads/new" variant="secondary" size="sm">
+              Submit it again
+            </ButtonLink>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-1 text-xs text-text-faint transition-colors hover:text-text-dim">
+                <ChevronRight
+                  aria-hidden
+                  className="h-3 w-3 transition-transform duration-200 group-open:rotate-90"
+                  strokeWidth={2.25}
+                />
+                Technical details
+              </summary>
+              <p className="t-data mt-1.5 text-xs text-text-faint">
+                Lead status: {receipt.lead_status} — the processing job exhausted its retries and
+                was dead-lettered.
+              </p>
+            </details>
+          </div>
         </Panel>
       )}
 
@@ -248,7 +286,27 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
                 </div>
               </Panel>
 
-              <EvidencePanel providers={receipt.providers} evidence={receipt.evidence} />
+              {/* Collapsed by default: the verdict panel's "What it used"
+                  line carries the counts; the full ledger is reference
+                  material, not part of the first read. */}
+              <details className="group/evidence">
+                <summary className="surface-flat flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-border-loud">
+                  <span className="min-w-0">
+                    <Eyebrow>Evidence</Eyebrow>
+                    <span className="mt-1 block text-sm text-text-dim">
+                      Every check ARIE made, what each returned, and what each cost
+                    </span>
+                  </span>
+                  <ChevronRight
+                    aria-hidden
+                    className="h-4 w-4 shrink-0 text-text-faint transition-transform duration-200 group-open/evidence:rotate-90"
+                    strokeWidth={2}
+                  />
+                </summary>
+                <div className="mt-4">
+                  <EvidencePanel providers={receipt.providers} evidence={receipt.evidence} />
+                </div>
+              </details>
             </div>
 
             <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
@@ -283,7 +341,14 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
                     mono
                   />
                   <CostRow label="Receipt" value={`v${receipt.receipt_version}`} mono muted />
+                  {receipt.stopping && (
+                    <CostRow label="Stop rule" value={receipt.stopping.reason_code} mono muted />
+                  )}
                 </dl>
+                <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2.5">
+                  <span className="text-xs text-text-faint">Lead ID</span>
+                  <IdChip value={leadId} truncate />
+                </div>
                 <p className="mt-3 border-t border-border pt-2.5 text-[0.6875rem] text-text-faint">
                   Decided {formatDateTime(receipt.created_at)}
                 </p>
