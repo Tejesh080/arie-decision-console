@@ -2,7 +2,7 @@
  * Types for the ARIE backend's public HTTP surface.
  *
  * Confirmed directly against the backend source
- * (adaptive-revenue-intelligence-engine, commit 80987ea):
+ * (arie-b2b-enrichment-engine, commit 80987ea):
  *   src/arie/api/schemas.py   — request/response Pydantic models
  *   src/arie/core/types.py    — LeadStatus, Decision enums
  *   src/arie/approval/workflow.py — ReviewAction enum

@@ -1,6 +1,6 @@
 # ARIE Decision Console
 
-The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine) — submit a lead, watch it move through evidence, scoring, and a decision, and see exactly why ARIE stopped where it did. When ARIE escalates a decision to a human, this is where that review happens: the machine's recommendation, the human's action, and the final outcome stay visible together, never collapsed into one.
+The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/Tejesh080/arie-b2b-enrichment-engine) — submit a lead, watch it move through evidence, scoring, and a decision, and see exactly why ARIE stopped where it did. When ARIE escalates a decision to a human, this is where that review happens: the machine's recommendation, the human's action, and the final outcome stay visible together, never collapsed into one.
 
 Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no auth, no real enrichment providers — see [Non-goals](#non-goals).
 
@@ -21,7 +21,7 @@ Open [http://localhost:3000](http://localhost:3000). Mock mode reproduces the ap
 
 ### Real ARIE mode
 
-**Prerequisite: the ARIE backend running locally at `http://localhost:8000`.** In the [`adaptive-revenue-intelligence-engine`](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine) repo (a sibling checkout, not part of this repo):
+**Prerequisite: the ARIE backend running locally at `http://localhost:8000`.** In the [`arie-b2b-enrichment-engine`](https://github.com/Tejesh080/arie-b2b-enrichment-engine) repo (a sibling checkout, not part of this repo):
 
 ```powershell
 docker compose up -d
@@ -156,7 +156,7 @@ The app is a stateless Next.js frontend with one server-side dependency: the ARI
 
    | Name                            | Value                                                                                                                                                |
    | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/Adaptive-Revenue-Intelligence-Engine#hosted-deployment) |
+   | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/arie-b2b-enrichment-engine#hosted-deployment) |
 
    Optionally also set `NEXT_PUBLIC_ARIE_PROVIDER_MODE` to `live` if — and only if — the backend it points at runs with `PROVIDER_MODE=live`. It changes nothing but wording: it is what makes the UI say "provider cost" instead of "modelled provider cost". Leave it unset for the hosted demo, which runs simulated.
 

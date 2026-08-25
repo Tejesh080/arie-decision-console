@@ -51,7 +51,7 @@ export async function proxyToArie(
         message: aborted
           ? `ARIE backend at ${backendBaseUrl()} did not respond in time.`
           : `Could not reach the ARIE backend at ${backendBaseUrl()}. Is it running? ` +
-            `(docker compose up -d in the adaptive-revenue-intelligence-engine repo)`,
+            `(docker compose up -d in the arie-b2b-enrichment-engine repo)`,
         cause: cause instanceof Error ? cause.message : String(cause),
       },
       { status: 502 },
