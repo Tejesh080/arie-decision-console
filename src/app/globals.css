@@ -204,6 +204,11 @@ body::before {
   outline: 2px solid var(--machine);
   outline-offset: 2px;
   border-radius: var(--r-sm);
+  /* A focus ring must never fade in. Several of these elements carry
+     Tailwind's `transition-colors`, whose property list includes
+     outline-color, so without this the indicator animates up from the
+     element's own text colour over 130ms instead of simply appearing. */
+  transition: none;
 }
 
 /* ---------------------------------------------------------------- motion */
