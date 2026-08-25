@@ -16,12 +16,18 @@ test("autonomous scenario: Nadia Delacroix reaches an autonomous decision", asyn
   // "Auto-routed" now appears twice on purpose: the status pill, and the
   // verdict prose naming the final status. Both are expected.
   await expect(page.getByText("Auto-routed", { exact: true }).first()).toBeVisible();
-  // A genuinely autonomous decision is framed as one -- there is no human
-  // stage in the chain to contrast it against, so the verdict panel names
-  // the decision directly.
-  await expect(page.getByText("Autonomous decision", { exact: true })).toBeVisible();
+  // The receipt reads in a fixed order, and each part has to be present:
+  // what happened, why it stopped buying, and what that used.
+  await expect(page.getByText("What happened", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Auto-route", exact: true })).toBeVisible();
-  await expect(page.getByText(/ARIE acted without a human/)).toBeVisible();
+  await expect(page.getByText(/confident enough to act without anyone checking/)).toBeVisible();
+  await expect(page.getByText("Why ARIE stopped", { exact: true })).toBeVisible();
+  await expect(page.getByText("What it used", { exact: true })).toBeVisible();
+
+  // "Who decided" must be answered even when the answer is "nobody was asked"
+  // -- an absent section reads as an omission.
+  await expect(page.getByText("Who decided", { exact: true })).toBeVisible();
+  await expect(page.getByText(/ARIE, on its own/)).toBeVisible();
 
   // No human review surface at all for a genuinely autonomous decision.
   // (exact: true -- Playwright's default text match is a case-insensitive

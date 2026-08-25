@@ -7,6 +7,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Wordmark } from "./brand/Mark";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { DemoModeChip } from "./DemoModeChip";
 
 /**
  * Navigation stays deliberately small. The backend exposes no endpoint to
@@ -82,7 +83,8 @@ export function AppHeader() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <DemoModeChip />
           <ConnectionStatus />
         </div>
       </div>

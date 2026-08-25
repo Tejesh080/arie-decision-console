@@ -23,8 +23,11 @@ test("escalation scenario: human review required, approve preserves the full seq
   await expect(page.getByText("Awaiting human review", { exact: true })).toBeVisible();
   await expect(page.getByText("Machine recommendation")).toBeVisible();
   await expect(page.getByRole("button", { name: "Reject", exact: true })).toBeVisible();
-  await expect(page.getByText("Autonomous", { exact: true })).toBeVisible();
-  await expect(page.getByText("No", { exact: true })).toBeVisible();
+  // The escalation framing has to say why nobody could act on it alone.
+  await expect(page.getByText(/was not confident enough to act on that alone/)).toBeVisible();
+  // Stated twice on purpose: once in the verdict figures, once in the
+  // reviewer's own decision context.
+  await expect(page.getByText("Autonomy threshold", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Human review required")).toBeVisible();
 
   // Approve through the UI (two-step confirm, no modal).

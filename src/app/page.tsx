@@ -16,6 +16,7 @@ import { Button, ButtonLink } from "@/components/ui/Button";
 import { Mark } from "@/components/brand/Mark";
 import { DecisionField } from "@/components/graphics/DecisionField";
 import { LeadCard } from "@/components/dashboard/LeadCard";
+import { DemoCards, DemoSteps } from "@/components/dashboard/DemoCards";
 import { riseIn, riseInStill, stagger } from "@/lib/motion";
 
 export default function DashboardPage() {
@@ -87,7 +88,7 @@ export default function DashboardPage() {
         variants={stagger(0.07)}
         initial="hidden"
         animate="show"
-        className="grid items-center gap-10 py-16 sm:py-20 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:gap-14"
+        className="grid items-center gap-10 py-14 sm:py-18 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:gap-14"
       >
         <div className="max-w-[40rem]">
           <motion.div variants={variants}>
@@ -97,25 +98,27 @@ export default function DashboardPage() {
             </span>
           </motion.div>
 
+          {/* The value has to land before anyone reads a second sentence. */}
           <motion.h1 variants={variants} className="t-display mt-6 text-balance text-text">
-            Not which provider to call next.{" "}
-            <span className="block text-text-dim">Whether to call at all.</span>
+            Stop paying for lead data once you already know enough to decide.
           </motion.h1>
 
           <motion.p
             variants={variants}
             className="mt-6 text-[1.0625rem] leading-relaxed text-text-dim"
           >
-            ARIE buys evidence for a lead only while it still changes the answer. It scores, checks
-            its own confidence against an autonomy threshold, and then either acts, rejects, or
-            hands the call to a person — and issues a receipt showing every reason it stopped where
-            it did.
+            ARIE buys enrichment one provider at a time, checks how confident it is after each one,
+            and stops as soon as more data could not change the answer — then routes the lead,
+            rejects it, or hands it to a person.
           </motion.p>
 
           <motion.div variants={variants} className="mt-8 flex flex-wrap items-center gap-3">
-            <ButtonLink href="/leads/new" variant="primary" size="lg">
-              Submit a lead
+            <ButtonLink href="/leads/new?run=autonomous" variant="primary" size="lg">
+              Run a demo lead
               <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+            </ButtonLink>
+            <ButtonLink href="/leads/new" variant="secondary" size="lg">
+              Submit your own
             </ButtonLink>
             {mode === "mock" && <Badge tone="human">Mock mode — no backend required</Badge>}
           </motion.div>
@@ -126,21 +129,40 @@ export default function DashboardPage() {
         </motion.div>
       </motion.section>
 
+      {/* --------------------------------------------------------- try it */}
+      <section className="border-t border-border py-14">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h2 className="t-h2 text-text">See it decide</h2>
+            <p className="mt-1.5 max-w-xl text-sm text-text-dim">
+              Three prepared leads, one for each outcome ARIE can reach. Each runs against the live
+              backend and ends on a Decision Receipt.
+            </p>
+          </div>
+          <DemoSteps />
+        </div>
+
+        <div className="mt-6">
+          <DemoCards />
+        </div>
+      </section>
+
       {/* -------------------------------------------------- local activity */}
       <section className="pb-24">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="t-h2 text-text">Recent activity</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="t-h2 text-text">Recent demo activity</h2>
               <Badge tone="neutral" size="sm">
                 <MonitorSmartphone aria-hidden className="h-3 w-3" strokeWidth={2} />
-                This browser
+                Stored on this browser
               </Badge>
             </div>
             <p className="mt-1.5 max-w-xl text-sm text-text-faint">
-              Leads submitted from this device, kept in local storage. ARIE exposes no endpoint to
-              list leads globally, so this is not a view of server-side state — statuses and costs
-              below are fetched live per lead.
+              Just the leads <em>you</em> ran, remembered locally so you can find your way back to a
+              receipt. It is not ARIE&apos;s dataset and an empty list here does not mean an empty
+              system — the backend exposes no endpoint to list leads globally, so no page could
+              honestly show one. Each card&apos;s status and cost is fetched live.
             </p>
           </div>
 
@@ -257,14 +279,14 @@ function EmptyState() {
       <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-md">
           <Eyebrow>No local history</Eyebrow>
-          <h3 className="t-h3 mt-2 text-text">Nothing submitted from this browser yet.</h3>
+          <h3 className="t-h3 mt-2 text-text">You haven&apos;t run anything yet.</h3>
           <p className="mt-2 text-sm leading-relaxed text-text-dim">
-            Submit a lead to watch it move through evidence acquisition, scoring and a confidence
-            check — then read the receipt. Already have a lead ID? Paste it into the lookup above.
+            Run one of the three examples above and it will appear here, so you can get back to its
+            receipt later. Already have a lead ID? Paste it into the lookup.
           </p>
           <div className="mt-5">
-            <ButtonLink href="/leads/new" variant="primary">
-              Submit your first lead
+            <ButtonLink href="/leads/new?run=autonomous" variant="primary">
+              Run a demo lead
               <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
             </ButtonLink>
           </div>

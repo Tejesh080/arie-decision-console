@@ -1,49 +1,37 @@
 "use client";
 
-import { CircleStop, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import clsx from "clsx";
 import type { ReceiptResponse } from "@/lib/api/types";
 import { decisionLabel, decisionPastTense } from "@/lib/format/decision";
 import { formatPercent, formatScore, formatUsdCompact, statusLabel } from "@/lib/format";
-import { costNounShort, costCaveat } from "@/lib/api/providerMode";
+import { costNounShort, costCaveat, isSimulated } from "@/lib/api/providerMode";
 import { Badge } from "@/components/ui/Badge";
 import { Eyebrow, Panel } from "@/components/ui/Panel";
-import { Stat, StatRow } from "@/components/ui/Stat";
 import { ConfidenceRail } from "./Gauges";
 
 /**
- * The answer, above the fold.
+ * The answer, in a fixed reading order.
  *
- * A reader should be able to leave after this one panel knowing what ARIE
- * decided, how sure it was, whether it was allowed to act alone, why it
- * stopped gathering evidence, and what that cost. Everything below it on the
- * page is the supporting detail for a claim already made here.
+ *   WHAT HAPPENED  -> the outcome and the four numbers behind it
+ *   WHY IT STOPPED -> in a sentence, not a reason code
+ *   WHAT IT USED   -> cached vs bought, and what that cost
  *
- * The three modes are visually distinct on purpose — an autonomous decision,
- * a decision handed to a person, and a shadow evaluation that changed
- * nothing are three different kinds of event, not three colours of the same
- * event.
+ * The order is the point. Previously this panel led with numbers and left the
+ * reader to work out why any of them mattered; a visitor who does not already
+ * know what an autonomy threshold is got no help at all. Now every figure sits
+ * next to a plain-language statement of what it means for this lead.
  */
 export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
   const { decision, score, stopping, shadow } = receipt;
   if (!decision || !score || !stopping) return null;
 
-  // An escalation has two distinct phases and they must not read alike.
-  // While the review is open, the headline is "escalated" -- that *is* the
-  // current state. Once a reviewer has responded, "escalated" describes a
-  // step that already happened, and leaving it as the headline would bury
-  // the actual outcome behind a stale one.
   const escalated = !decision.autonomous && !shadow;
   const reviewResolved = escalated && !!receipt.human_review?.responded_at;
+  const cleared = score.confidence >= score.tau;
+  const gap = Math.abs(score.confidence - score.tau) * 100;
 
   const accent = shadow ? "shadow" : escalated ? "human" : "machine";
-
-  // When a lead escalated, the machine/human/final chain below states the
-  // recommendation as its own stage. Repeating it as this panel's headline
-  // put the word "Reject" on screen twice in two different colours, reading
-  // as two separate findings. Here the headline is what *happened* to the
-  // lead; the recommendation moves into the prose, where it is still stated
-  // outright and never softened.
   const headline = shadow
     ? `Would have ${decisionPastTense(decision.recommended_action)}`
     : reviewResolved
@@ -61,32 +49,27 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
         ? "text-human"
         : "text-machine";
 
+  const fresh = receipt.providers.called.filter((c) => !c.cache_hit).length;
+  const cached = receipt.providers.called.length - fresh;
+
   return (
     <Panel accent={accent} padding="lg" as="section">
+      {/* ---------------------------------------------- what happened -- */}
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <span className="flex items-center gap-2">
             {shadow && (
               <Eye aria-hidden className="h-3.5 w-3.5 text-shadow-role" strokeWidth={2.25} />
             )}
-            <Eyebrow>
-              {shadow
-                ? "Shadow evaluation"
-                : reviewResolved
-                  ? "Final outcome — after human review"
-                  : escalated
-                    ? "Decision outcome"
-                    : "Autonomous decision"}
-            </Eyebrow>
+            <Eyebrow>What happened</Eyebrow>
           </span>
           <h2 className={clsx("t-h1 mt-2.5", headlineTone)}>{headline}</h2>
           <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-text-dim">
             {shadow ? (
               <>
-                ARIE computed this recommendation alongside the existing workflow and took{" "}
-                <strong className="font-medium text-text">no authoritative action</strong> — nothing
-                was routed, nothing rejected, no human review opened. This is what ARIE would have
-                done, not what happened.
+                ARIE worked the lead all the way through and then deliberately did nothing with the
+                answer — nothing routed, nothing rejected, nobody asked. This is what it{" "}
+                <em>would</em> have done.
               </>
             ) : reviewResolved ? (
               <>
@@ -94,14 +77,14 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
                 <strong className="font-medium text-text">
                   {decisionLabel(decision.recommended_action)}
                 </strong>{" "}
-                but could not act alone, so{" "}
+                but was not confident enough to act alone, so{" "}
                 <strong className="font-medium text-text">
                   {receipt.human_review?.reviewer ?? "a reviewer"}
                 </strong>{" "}
                 decided.{" "}
                 {decision.human_override
-                  ? "They went a different way from ARIE — both records stand, in sequence, below."
-                  : "They upheld ARIE's recommendation."}
+                  ? "They went a different way from ARIE. Both records stand, in sequence, below."
+                  : "They agreed with ARIE."}
               </>
             ) : escalated ? (
               <>
@@ -109,14 +92,12 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
                 <strong className="font-medium text-text">
                   {decisionLabel(decision.recommended_action)}
                 </strong>
-                , but confidence did not clear the autonomy threshold — so it stopped short of
-                acting and handed the call to a person. That recommendation stands on the record
-                whatever the reviewer decides.
+                , but was not confident enough to act on that alone — so it stopped and handed the
+                call to a person rather than guessing.
               </>
             ) : (
               <>
-                Confidence cleared the autonomy threshold, so ARIE acted without a human. Final
-                status:{" "}
+                ARIE was confident enough to act without anyone checking, so it did. Final status:{" "}
                 <strong className="font-medium text-text">
                   {statusLabel(receipt.lead_status)}
                 </strong>
@@ -135,56 +116,110 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
         ) : null}
       </div>
 
-      <div className="mt-8 border-t border-border pt-6">
-        <StatRow>
-          <Stat
-            label="Score"
-            hint={`≥ ${formatScore(score.threshold_qualify)} qualifies`}
-            value={formatScore(score.value)}
-          />
-          <Stat
-            label="Confidence"
-            hint={`threshold ${formatPercent(score.tau)}`}
-            value={formatPercent(score.confidence)}
-            tone={shadow ? "shadow" : score.confidence >= score.tau ? "qualify" : "human"}
-          />
-          <Stat
-            label="Autonomous"
-            value={decision.autonomous ? "Yes" : "No"}
-            // Green "Yes" would read as "it went ahead". Under shadow mode the
-            // autonomy check passed but nothing was executed, so it stays in
-            // the shadow colour and says so underneath.
-            tone={shadow ? "shadow" : decision.autonomous ? "qualify" : "human"}
-            sub={shadow ? "Computed, never executed" : undefined}
-          />
-          <Stat
-            label={costNounShort()}
-            hint={`cap ${formatUsdCompact(receipt.cost.budget_usd_cap)}`}
-            value={formatUsdCompact(receipt.cost.total_cost_usd)}
-          />
-        </StatRow>
-      </div>
+      {/* Four numbers, each with what it means written underneath it. */}
+      <dl className="mt-8 grid grid-cols-2 gap-x-5 gap-y-6 border-t border-border pt-6 sm:grid-cols-4">
+        <Figure
+          label="Score"
+          value={formatScore(score.value)}
+          meaning={`${formatScore(score.threshold_qualify)} or above qualifies`}
+        />
+        <Figure
+          label="Confidence"
+          value={formatPercent(score.confidence)}
+          tone={shadow ? "text-shadow-role" : cleared ? "text-qualify" : "text-human"}
+          meaning="how sure ARIE was in this answer"
+        />
+        <Figure
+          label="Autonomy threshold"
+          value={formatPercent(score.tau)}
+          meaning={
+            cleared
+              ? `cleared it by ${gap.toFixed(1)} points`
+              : `missed it by ${gap.toFixed(1)} points`
+          }
+        />
+        <Figure
+          label={costNounShort()}
+          value={formatUsdCompact(receipt.cost.total_cost_usd)}
+          meaning={`of a ${formatUsdCompact(receipt.cost.budget_usd_cap)} budget for this lead`}
+        />
+      </dl>
 
-      <div className="mt-8">
+      <div className="mt-7">
         <ConfidenceRail confidence={score.confidence} tau={score.tau} shadow={shadow} />
       </div>
 
-      <div className="mt-7 rounded-md border border-border bg-bg-sunken p-4">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <CircleStop
-            aria-hidden
-            className="h-3.5 w-3.5 shrink-0 text-text-faint"
-            strokeWidth={2.25}
-          />
-          <Eyebrow>Why ARIE stopped acquiring evidence</Eyebrow>
-          <code className="t-data rounded border border-border bg-surface px-1.5 py-0.5 text-text-dim sm:ml-auto">
+      {/* ------------------------------------------------ why it stopped -- */}
+      <div className="mt-8 border-t border-border pt-6">
+        <Eyebrow>Why ARIE stopped</Eyebrow>
+        <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-text">{stopping.explanation}</p>
+        <p className="mt-2 text-[0.8125rem] leading-relaxed text-text-faint">
+          Every provider call costs money, so ARIE only keeps buying while the next one could still
+          change the answer.{" "}
+          <code className="t-data rounded border border-border bg-bg-sunken px-1.5 py-0.5">
             {stopping.reason_code}
-          </code>
-        </span>
-        <p className="mt-2.5 text-sm leading-relaxed text-text-dim">{stopping.explanation}</p>
+          </code>{" "}
+          is the rule that fired.
+        </p>
       </div>
 
-      <p className="mt-4 text-[0.6875rem] leading-relaxed text-text-faint">{costCaveat()}</p>
+      {/* -------------------------------------------------- what it used -- */}
+      <div className="mt-7 border-t border-border pt-6">
+        <Eyebrow>What it used</Eyebrow>
+        <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-text">
+          {cached > 0 && (
+            <>
+              <strong className="font-medium">{cached}</strong> signal{cached === 1 ? "" : "s"}{" "}
+              already cached from earlier leads
+              {fresh > 0 ? ", " : " — nothing new had to be bought"}
+            </>
+          )}
+          {fresh > 0 && (
+            <>
+              {cached > 0 ? "and " : ""}
+              <strong className="font-medium">{fresh}</strong> new provider call
+              {fresh === 1 ? "" : "s"}
+            </>
+          )}
+          {(cached > 0 || fresh > 0) && (
+            <>
+              , for{" "}
+              <strong className="font-medium">
+                {formatUsdCompact(receipt.cost.total_cost_usd)}
+              </strong>
+              {isSimulated() ? " of modelled cost" : ""}.
+            </>
+          )}
+          {cached === 0 && fresh === 0 && "No provider was reached before ARIE stopped."}
+        </p>
+        <p className="mt-2 text-[0.8125rem] leading-relaxed text-text-faint">{costCaveat()}</p>
+      </div>
     </Panel>
+  );
+}
+
+/** A figure with its meaning attached. A number nobody can interpret is
+ * decoration; the caption is the part that does the work. */
+function Figure({
+  label,
+  value,
+  meaning,
+  tone,
+}: {
+  label: string;
+  value: string;
+  meaning: string;
+  tone?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt>
+        <Eyebrow>{label}</Eyebrow>
+      </dt>
+      <dd>
+        <p className={clsx("t-metric mt-2 text-[1.75rem]", tone ?? "text-text")}>{value}</p>
+        <p className="mt-1.5 text-[0.75rem] leading-snug text-text-faint">{meaning}</p>
+      </dd>
+    </div>
   );
 }

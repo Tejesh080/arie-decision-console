@@ -30,6 +30,8 @@ import { IdChip } from "@/components/ui/CopyButton";
 import { Eyebrow, Panel } from "@/components/ui/Panel";
 import { ScoreBand } from "@/components/receipt/Gauges";
 import { VerdictPanel } from "@/components/receipt/VerdictPanel";
+import { StopFlow } from "@/components/receipt/StopFlow";
+import { WhoDecided } from "@/components/receipt/WhoDecided";
 import { EvidencePanel } from "@/components/receipt/EvidencePanel";
 import { HumanReviewPanel } from "@/components/receipt/HumanReviewPanel";
 import { ProcessingRail } from "@/components/receipt/ProcessingRail";
@@ -207,10 +209,13 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
         >
           <VerdictPanel receipt={receipt} />
 
+          <StopFlow receipt={receipt} />
+
           {/* The chain only exists when a person was actually involved. For a
               purely autonomous decision there is no human stage to draw, and
-              inventing one would imply oversight that never happened. */}
-          {receipt.human_review && review && !receipt.shadow && (
+              inventing one would imply oversight that never happened -- but
+              the question still gets answered, by WhoDecided below. */}
+          {receipt.human_review && review && !receipt.shadow ? (
             <HumanReviewPanel
               review={review}
               receipt={receipt}
@@ -223,6 +228,8 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
                 refresh();
               }}
             />
+          ) : (
+            <WhoDecided receipt={receipt} />
           )}
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
@@ -245,6 +252,7 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
             </div>
 
             <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
+              <p className="t-label text-text-faint">Technical details</p>
               <Panel padding="sm">
                 <Eyebrow>{costNoun()}</Eyebrow>
                 <dl className="mt-3 flex flex-col gap-2 text-sm">

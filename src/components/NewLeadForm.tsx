@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowRight, CircleAlert, Eye, Sparkle } from "lucide-react";
 import clsx from "clsx";
@@ -9,7 +9,8 @@ import { submitLead } from "@/lib/api/leads";
 import { pollLeadUntilSettled } from "@/lib/api/polling";
 import { addRecentLead } from "@/lib/localHistory";
 import { ArieApiError, ArieTimeoutError, ArieValidationError } from "@/lib/api/errors";
-import type { LeadStatus } from "@/lib/api/types";
+import type { IngestLeadRequest, LeadStatus } from "@/lib/api/types";
+import { findExample, freshExternalRef } from "@/lib/demoExamples";
 import { Panel, Eyebrow } from "./ui/Panel";
 import { Badge } from "./ui/Badge";
 import { Button } from "./ui/Button";
@@ -53,12 +54,9 @@ const DEMO_PRESETS: Preset[] = [
   },
 ];
 
-function freshExternalRef(): string {
-  return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
 export function NewLeadForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reduced = useReducedMotion();
 
   const [source, setSource] = useState("arie-web");
@@ -82,22 +80,13 @@ export function NewLeadForm() {
     setExternalRef(freshExternalRef());
   };
 
-  const handleSubmit = useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
+  const run = useCallback(
+    async (payload: IngestLeadRequest, label: string) => {
       setError(null);
       setState("submitting");
 
       try {
-        const result = await submitLead({
-          source,
-          email,
-          full_name: fullName || null,
-          company_domain: companyDomain || null,
-          company_name: companyName || null,
-          external_ref: externalRef || null,
-          mode: shadowMode ? "shadow" : "normal",
-        });
+        const result = await submitLead(payload);
         setSubmittedLeadId(result.lead_id);
         setState("processing");
         setCurrentStatus(result.status);
@@ -116,8 +105,8 @@ export function NewLeadForm() {
 
         addRecentLead({
           lead_id: result.lead_id,
-          label: fullName || email,
-          email,
+          label,
+          email: payload.email,
           submitted_at: new Date().toISOString(),
           is_shadow: result.is_shadow,
         });
@@ -135,8 +124,53 @@ export function NewLeadForm() {
         }
       }
     },
-    [source, email, fullName, companyDomain, companyName, externalRef, shadowMode, router],
+    [router],
   );
+
+  const handleSubmit = useCallback(
+    (event: React.FormEvent) => {
+      event.preventDefault();
+      void run(
+        {
+          source,
+          email,
+          full_name: fullName || null,
+          company_domain: companyDomain || null,
+          company_name: companyName || null,
+          external_ref: externalRef || null,
+          mode: shadowMode ? "shadow" : "normal",
+        },
+        fullName || email,
+      );
+    },
+    [run, source, email, fullName, companyDomain, companyName, externalRef, shadowMode],
+  );
+
+  // `?run=<example>` fires one of the prepared examples on arrival, which is
+  // what makes the homepage cards one click rather than "fill this form in".
+  // Guarded by a ref, not by state, so React's development double-invoke
+  // cannot submit the same lead twice.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current) return;
+    const example = findExample(searchParams.get("run"));
+    if (!example) return;
+    autoRan.current = true;
+
+    // Syncing form state from the URL, which is the external system here. The
+    // fields are populated as well as submitted so that if the run fails, the
+    // form the user falls back to is already filled in rather than empty.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEmail(example.lead.email);
+    setFullName(example.lead.full_name ?? "");
+    setCompanyDomain(example.lead.company_domain ?? "");
+    setCompanyName(example.lead.company_name ?? "");
+    setShadowMode(example.lead.mode === "shadow");
+    void run(
+      { ...example.lead, external_ref: freshExternalRef() },
+      example.lead.full_name ?? example.lead.email,
+    );
+  }, [searchParams, run]);
 
   const isBusy = state === "submitting" || state === "processing";
 
