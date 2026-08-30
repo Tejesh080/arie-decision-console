@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppHeader } from "@/components/AppHeader";
 import { AmbientField } from "@/components/graphics/AmbientField";
 import "./globals.css";
 
@@ -39,10 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full`}>
       <body className="relative flex min-h-full flex-col">
         <AmbientField />
-        <AppHeader />
-        <main id="content" className="relative z-0 flex-1">
-          {children}
-        </main>
+        {children}
       </body>
     </html>
   );

@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useState } from "react";
 import clsx from "clsx";
+import { getDataMode } from "@/lib/api/mode";
 import { Wordmark } from "./brand/Mark";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { DemoModeChip } from "./DemoModeChip";
+import { SignOutButton } from "./SignOutButton";
 
 /**
  * Navigation stays deliberately small. The backend exposes no endpoint to
@@ -86,6 +88,7 @@ export function AppHeader() {
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <DemoModeChip />
           <ConnectionStatus />
+          {getDataMode() === "api" && <SignOutButton />}
         </div>
       </div>
     </header>

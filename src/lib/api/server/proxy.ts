@@ -29,18 +29,36 @@ function backendBaseUrl(): string {
   return process.env.NEXT_PUBLIC_ARIE_API_BASE_URL?.trim() || DEFAULT_BASE_URL;
 }
 
+export interface ArieAuthHeaders {
+  accessToken: string;
+  organizationId: string;
+}
+
 export async function proxyToArie(
   backendPath: string,
   init: { method: "GET" | "POST"; body?: unknown },
+  auth?: ArieAuthHeaders,
 ): Promise<NextResponse> {
   const url = `${backendBaseUrl()}${backendPath}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
+  const headers: Record<string, string> = {};
+  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  // Human callers only — the backend's other auth path (an ARIE organization
+  // API key) is for machine callers (n8n, scripts) and never belongs in
+  // browser-reachable code. Omitting `auth` entirely (the `/healthz` route)
+  // is the one deliberate exception: that endpoint requires no caller
+  // identity at all.
+  if (auth) {
+    headers["Authorization"] = `Bearer ${auth.accessToken}`;
+    headers["X-Organization-Id"] = auth.organizationId;
+  }
+
   try {
     const response = await fetch(url, {
       method: init.method,
-      headers: init.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       signal: controller.signal,
       cache: "no-store",

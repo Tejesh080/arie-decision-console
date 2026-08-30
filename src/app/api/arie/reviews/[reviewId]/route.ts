@@ -1,4 +1,5 @@
 import { proxyToArie } from "@/lib/api/server/proxy";
+import { requireAuth } from "@/lib/api/server/requireAuth";
 
 /**
  * Vercel function duration. Without this the platform default (10s on the
@@ -13,6 +14,9 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ reviewId: string }> },
 ) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+
   const { reviewId } = await params;
-  return proxyToArie(`/reviews/${encodeURIComponent(reviewId)}`, { method: "GET" });
+  return proxyToArie(`/reviews/${encodeURIComponent(reviewId)}`, { method: "GET" }, auth.auth);
 }

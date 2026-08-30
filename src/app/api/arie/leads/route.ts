@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { proxyToArie } from "@/lib/api/server/proxy";
+import { requireAuth } from "@/lib/api/server/requireAuth";
 
 /**
  * Vercel function duration. Without this the platform default (10s on the
@@ -11,6 +12,9 @@ import { proxyToArie } from "@/lib/api/server/proxy";
 export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+
   const body = await request.json();
-  return proxyToArie("/leads", { method: "POST", body });
+  return proxyToArie("/leads", { method: "POST", body }, auth.auth);
 }

@@ -2,7 +2,7 @@
 
 The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/Tejesh080/arie-b2b-enrichment-engine) — submit a lead, watch it move through evidence, scoring, and a decision, and see exactly why ARIE stopped where it did. When ARIE escalates a decision to a human, this is where that review happens: the machine's recommendation, the human's action, and the final outcome stay visible together, never collapsed into one.
 
-Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no auth, no real enrichment providers — see [Non-goals](#non-goals).
+Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no real enrichment providers — see [Non-goals](#non-goals). Supabase authentication gates the app in "api" mode only — see [Authentication](#authentication).
 
 **[Live demo](https://arie-web.vercel.app/)** — hosted on Vercel, talking to the real hosted backend (Railway + Supabase) through this app's own server-side proxy. See [Deploy to Vercel](#deploy-to-vercel) below for how it's configured.
 
@@ -47,6 +47,34 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) — the connection status badge in the header confirms it can reach ARIE.
 
 **Why a proxy, not direct browser calls.** The ARIE backend has no CORS middleware (confirmed against its source, not assumed), so a browser calling `http://localhost:8000` directly from a different origin would be blocked. Every request instead goes to this app's own server-side Route Handlers under `src/app/api/arie/*`, which forward to the backend server-to-server, where CORS doesn't apply. `NEXT_PUBLIC_ARIE_API_BASE_URL` is read there, and nowhere else — no component ever hardcodes `localhost:8000`.
+
+**"api" mode requires signing in** — the backend has required an authenticated caller since Productization M1. See [Authentication](#authentication) for the two extra env vars and what happens if you skip them.
+
+---
+
+## Authentication
+
+Human sign-in, added on top of the machine-to-machine ARIE API keys n8n and the demo script use (this app never uses those — see [Non-goals](#non-goals)).
+
+**"mock" mode has no login wall at all**, on purpose: it's a fabricated, client-side-only demo with no real backend and nothing to protect. Gating it behind Supabase would break the zero-config portfolio/screenshot use case above for no security benefit. The gate (`middleware.ts`, `src/app/(app)/layout.tsx`) checks `NEXT_PUBLIC_ARIE_DATA_MODE` first and is a complete no-op outside `"api"`.
+
+**In "api" mode**, two more env vars are required (Supabase Dashboard → Project Settings → API for the same Supabase project the backend uses):
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/public key>
+```
+
+The anon key is meant to be public — Row Level Security on the database is what actually protects data behind it, not secrecy of this key. Never set `SUPABASE_JWT_SECRET`, a service-role key, or any ARIE machine API key here; this app never needs them, and a `NEXT_PUBLIC_` prefix would ship any of them straight into the browser bundle.
+
+**How it fits together:**
+
+- `/login` — email + password (`supabase.auth.signInWithPassword`). No magic link, no OAuth — both need a redirect URL registered in Supabase's Auth settings first; password auth needs nothing beyond the anon key this app already has.
+- `middleware.ts` refreshes the session cookie every request and redirects a signed-out visitor to `/login` (except `/login` itself and `/api/arie/*`, which enforce auth independently — a 307 to an HTML page would break their JSON contract).
+- `src/app/(app)/layout.tsx` resolves the signed-in user's organization membership by querying `organization_members` **directly against Supabase** — not through the ARIE backend. This goes through a service-role admin client (`src/lib/supabase/admin.ts`), not the plain RLS-scoped session client: `organization_members`' own RLS policies recurse infinitely for a non-service-role caller (confirmed against the database), a backend schema defect outside this app's scope to fix. The lookup stays strictly scoped to the caller's own `user.id`, taken from `getUser()`'s server-verified identity — never anything client-supplied — so this doesn't weaken isolation. No active membership renders a plain "no organization access" message instead of the console.
+- Every `/api/arie/*` route (except `/healthz`, which needs no caller identity) calls the same resolver (`src/lib/auth/context.ts`) before ever reaching `proxyToArie`, then forwards `Authorization: Bearer <Supabase access token>` and `X-Organization-Id: <organization UUID>` — the backend's human-caller auth path. An unauthenticated request never reaches the real backend at all.
+
+Multiple organization memberships aren't handled with a switcher — the oldest active membership is picked deterministically. Every user in this deployment belongs to exactly one organization today; a switcher for a case that doesn't exist yet would be unused UI.
 
 **Mode never silently falls back.** If `NEXT_PUBLIC_ARIE_DATA_MODE=api` and the backend is unreachable, the UI shows a clear "ARIE backend unavailable" state with a retry button — it does not quietly serve mock data instead, which would be indistinguishable from a real (if unlikely) result.
 
@@ -149,22 +177,25 @@ npm run test:e2e       # Playwright — see e2e/ (run the dev server first, in t
 
 ## Deploy to Vercel
 
-The app is a stateless Next.js frontend with one server-side dependency: the ARIE backend's public URL. No database, no secrets of its own.
+The app is a stateless Next.js frontend with two server-side dependencies: the ARIE backend's public URL, and (in "api" mode) Supabase. No database of its own.
 
 1. [Import this repo](https://vercel.com/new) into Vercel. Framework preset (Next.js) and build settings are auto-detected — leave them as-is.
-2. Add one environment variable:
+2. Add environment variables:
 
    | Name                            | Value                                                                                                                                      |
    | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
    | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/arie-b2b-enrichment-engine#hosted-deployment) |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — see [Authentication](#authentication)                                                     |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — the anon/public key, safe to expose (see [Authentication](#authentication))               |
+   | `SUPABASE_SERVICE_ROLE_KEY`     | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — server-only (deliberately **no** `NEXT_PUBLIC_` prefix), used by `src/lib/supabase/admin.ts` to work around the `organization_members` RLS recursion bug (see [Authentication](#authentication)) |
 
    Optionally also set `NEXT_PUBLIC_ARIE_PROVIDER_MODE` to `live` if — and only if — the backend it points at runs with `PROVIDER_MODE=live`. It changes nothing but wording: it is what makes the UI say "provider cost" instead of "modelled provider cost". Leave it unset for the hosted demo, which runs simulated.
 
-   Leave `NEXT_PUBLIC_ARIE_DATA_MODE` unset for mock mode (safe default, no backend dependency at all), or set it to `api` once you want the deployed app to talk to the real hosted backend.
+   Leave `NEXT_PUBLIC_ARIE_DATA_MODE` unset for mock mode (safe default, no backend dependency at all, no login wall), or set it to `api` once you want the deployed app to talk to the real hosted backend and require sign-in.
 
 3. Deploy. Nothing else is required — the same server-side proxy architecture (`src/app/api/arie/*`) that talks to a local Docker backend talks to the hosted one identically; only the URL changes.
 
-Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, or any provider API key here — this app never needs them and never sees them; only the backend does.
+Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, `SUPABASE_JWT_SECRET`, an ARIE machine API key, or any provider API key here — this app never needs them and never sees them; only the backend does. The one deliberate exception to "no secrets here" is `SUPABASE_SERVICE_ROLE_KEY` above — required, server-only, and never prefixed `NEXT_PUBLIC_`. Anything prefixed `NEXT_PUBLIC_` ships into the browser bundle, which is exactly why only the two Supabase values meant to be public carry that prefix.
 
 **The live demo above runs with `NEXT_PUBLIC_ARIE_DATA_MODE=api`**, verified end to end against the real Railway backend: an autonomous decision, a human-review approval with the machine recommendation kept separate from the human action and the final outcome, and a shadow evaluation, all through the deployed UI — not just a healthcheck. A Vercel env var change doesn't apply to an already-running deployment; redeploy after changing one.
 
@@ -172,4 +203,4 @@ Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, or any provider API key here �
 
 ## Non-goals
 
-Auth, users, teams, multi-tenancy, billing, CRM/OAuth integrations, real enrichment providers. Production _hosting_ (Vercel, above) is in scope; a production _security posture_ — auth, tenancy, rate limiting — is not.
+User/team management (invitations, roles, billing), an organization switcher, CRM/OAuth integrations, real enrichment providers, rate limiting. Human sign-in and organization-scoped access are in scope (see [Authentication](#authentication)); everything above it in a full multi-tenant product is not.
