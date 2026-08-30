@@ -71,7 +71,7 @@ The anon key is meant to be public — Row Level Security on the database is wha
 
 - `/login` — email + password (`supabase.auth.signInWithPassword`). No magic link, no OAuth — both need a redirect URL registered in Supabase's Auth settings first; password auth needs nothing beyond the anon key this app already has.
 - `middleware.ts` refreshes the session cookie every request and redirects a signed-out visitor to `/login` (except `/login` itself and `/api/arie/*`, which enforce auth independently — a 307 to an HTML page would break their JSON contract).
-- `src/app/(app)/layout.tsx` resolves the signed-in user's organization membership by querying `organization_members` **directly against Supabase** — not through the ARIE backend. This goes through a service-role admin client (`src/lib/supabase/admin.ts`), not the plain RLS-scoped session client: `organization_members`' own RLS policies recurse infinitely for a non-service-role caller (confirmed against the database), a backend schema defect outside this app's scope to fix. The lookup stays strictly scoped to the caller's own `user.id`, taken from `getUser()`'s server-verified identity — never anything client-supplied — so this doesn't weaken isolation. No active membership renders a plain "no organization access" message instead of the console.
+- `src/app/(app)/layout.tsx` resolves the signed-in user's organization membership by querying `organization_members` **directly against Supabase**, through the same RLS-scoped session client used everywhere else — not through the ARIE backend, and no service-role key involved. (An earlier version of this app worked around a backend RLS recursion bug — `organization_members`' policies calling helper functions that queried the same table — with a service-role admin client; the backend's `migrations/0018_fix_rls_membership_recursion.sql` fixed the recursion at its source, so this app no longer needs that workaround.) No active membership renders a plain "no organization access" message instead of the console.
 - Every `/api/arie/*` route (except `/healthz`, which needs no caller identity) calls the same resolver (`src/lib/auth/context.ts`) before ever reaching `proxyToArie`, then forwards `Authorization: Bearer <Supabase access token>` and `X-Organization-Id: <organization UUID>` — the backend's human-caller auth path. An unauthenticated request never reaches the real backend at all.
 
 Multiple organization memberships aren't handled with a switcher — the oldest active membership is picked deterministically. Every user in this deployment belongs to exactly one organization today; a switcher for a case that doesn't exist yet would be unused UI.
@@ -177,7 +177,7 @@ npm run test:e2e       # Playwright — see e2e/ (run the dev server first, in t
 
 ## Deploy to Vercel
 
-The app is a stateless Next.js frontend with two server-side dependencies: the ARIE backend's public URL, and (in "api" mode) Supabase. No database of its own.
+The app is a stateless Next.js frontend with two server-side dependencies: the ARIE backend's public URL, and (in "api" mode) Supabase. No database of its own, and no secrets of its own either — every value below is either public-by-design or not a secret at all.
 
 1. [Import this repo](https://vercel.com/new) into Vercel. Framework preset (Next.js) and build settings are auto-detected — leave them as-is.
 2. Add environment variables:
@@ -187,7 +187,6 @@ The app is a stateless Next.js frontend with two server-side dependencies: the A
    | `NEXT_PUBLIC_ARIE_API_BASE_URL` | The backend's public URL — see [its own hosted-deployment docs](https://github.com/Tejesh080/arie-b2b-enrichment-engine#hosted-deployment) |
    | `NEXT_PUBLIC_SUPABASE_URL`      | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — see [Authentication](#authentication)                                                     |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — the anon/public key, safe to expose (see [Authentication](#authentication))               |
-   | `SUPABASE_SERVICE_ROLE_KEY`     | Required once `NEXT_PUBLIC_ARIE_DATA_MODE=api` — server-only (deliberately **no** `NEXT_PUBLIC_` prefix), used by `src/lib/supabase/admin.ts` to work around the `organization_members` RLS recursion bug (see [Authentication](#authentication)) |
 
    Optionally also set `NEXT_PUBLIC_ARIE_PROVIDER_MODE` to `live` if — and only if — the backend it points at runs with `PROVIDER_MODE=live`. It changes nothing but wording: it is what makes the UI say "provider cost" instead of "modelled provider cost". Leave it unset for the hosted demo, which runs simulated.
 
@@ -195,7 +194,7 @@ The app is a stateless Next.js frontend with two server-side dependencies: the A
 
 3. Deploy. Nothing else is required — the same server-side proxy architecture (`src/app/api/arie/*`) that talks to a local Docker backend talks to the hosted one identically; only the URL changes.
 
-Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, `SUPABASE_JWT_SECRET`, an ARIE machine API key, or any provider API key here — this app never needs them and never sees them; only the backend does. The one deliberate exception to "no secrets here" is `SUPABASE_SERVICE_ROLE_KEY` above — required, server-only, and never prefixed `NEXT_PUBLIC_`. Anything prefixed `NEXT_PUBLIC_` ships into the browser bundle, which is exactly why only the two Supabase values meant to be public carry that prefix.
+Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, `SUPABASE_JWT_SECRET`, a Supabase service-role key, an ARIE machine API key, or any provider API key here — this app never needs them and never sees them; only the backend does. (An earlier revision of this app did need a service-role key, as a workaround for a backend RLS bug — see [Authentication](#authentication) — fixed at the source and no longer required.) Anything prefixed `NEXT_PUBLIC_` ships into the browser bundle, which is exactly why only the two Supabase values above, both meant to be public, carry that prefix.
 
 **The live demo above runs with `NEXT_PUBLIC_ARIE_DATA_MODE=api`**, verified end to end against the real Railway backend: an autonomous decision, a human-review approval with the machine recommendation kept separate from the human action and the final outcome, and a shadow evaluation, all through the deployed UI — not just a healthcheck. A Vercel env var change doesn't apply to an already-running deployment; redeploy after changing one.
 

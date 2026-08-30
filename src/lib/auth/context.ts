@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * The one place a request's session and organization membership are
@@ -7,15 +6,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * page-level access gate (`app/(app)/layout.tsx`), so they can never
  * disagree about who is authorized for what.
  *
- * Organization membership is looked up in `organization_members`, but via
- * the service-role admin client (`@/lib/supabase/admin`), not the plain
- * RLS-scoped session client — see that module's docstring for why the RLS
- * path recurses infinitely for this exact table. The lookup is still
- * strictly scoped to `user.id`, which comes from `getUser()`'s own
- * server-verified identity, never from anything client-supplied, so this
- * doesn't weaken isolation: it's the same "verify identity, then use a
- * privileged connection scoped to that identity" pattern the ARIE backend
- * itself uses.
+ * Organization membership is looked up in `organization_members` through the
+ * same RLS-scoped session client used for everything else — no service-role
+ * key involved. That table's RLS policies previously recursed infinitely for
+ * any non-bypassing client (`arie_has_role()`/`arie_current_organization_ids()`
+ * were `SECURITY INVOKER` and queried the very table their own policies
+ * guard); the backend's `migrations/0018_fix_rls_membership_recursion.sql`
+ * made both `SECURITY DEFINER`, which was this app's own workaround
+ * (`@/lib/supabase/admin`'s service-role client) until then. Direct RLS
+ * access is now verified working end-to-end, so the workaround is retired.
  */
 export type AuthContext =
   | { state: "unauthenticated" }
@@ -46,8 +45,7 @@ export async function resolveAuthContext(): Promise<AuthContext> {
   // organization switcher: every user in this deployment belongs to exactly
   // one organization today, and a picker for a case that doesn't exist yet
   // would be unused UI, not a feature.
-  const admin = createAdminClient();
-  const { data: memberships, error } = await admin
+  const { data: memberships, error } = await supabase
     .from("organization_members")
     .select("organization_id")
     .eq("user_id", user.id)
