@@ -12,14 +12,18 @@ import { DemoModeChip } from "./DemoModeChip";
 import { SignOutButton } from "./SignOutButton";
 
 /**
- * Navigation stays deliberately small. The backend exposes no endpoint to
- * list leads, reviews or receipts globally, so there is no honest "Leads" or
- * "Review queue" destination to link to — inventing one would be a nav item
- * that can only ever 404 or lie.
+ * Was deliberately minimal before Productization M3 — the backend exposed
+ * no endpoint to list leads/reviews/receipts globally, so a "Leads" or
+ * "Review queue" link could only ever 404 or lie. Batches, ICP configuration,
+ * and usage are all genuinely listable now, so those three earn a spot; a
+ * global lead list still isn't, so it still isn't here.
  */
 const NAV = [
   { href: "/", label: "Overview" },
   { href: "/leads/new", label: "New lead" },
+  { href: "/batches", label: "Batches" },
+  { href: "/icp", label: "ICP" },
+  { href: "/usage", label: "Usage" },
 ] as const;
 
 export function AppHeader() {

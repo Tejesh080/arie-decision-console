@@ -224,6 +224,11 @@ export interface ReceiptVersions {
   policy: string;
   scorer: string;
   confidence_calibration: string;
+  /** Productization M3. `null` for a receipt written before organization
+   * ICP profiles existed, or one whose organization had no active profile
+   * at decision time (both scored against the identical reference config). */
+  icp_profile_id: string | null;
+  icp_profile_version: number | null;
 }
 
 export interface ReceiptResponse {
@@ -284,4 +289,121 @@ export interface ReviewDecisionResponse {
   lead_status: LeadStatus;
   lead_version: number;
   already_applied: boolean;
+}
+
+// --------------------------------------------------------- ICP profiles --
+//
+// Productization M3. Mirrors `arie.icp_profiles.REFERENCE_CONFIG`'s shape
+// and `arie.api.schemas.ICPProfileConfigInput`/`ICPProfileResponse` field
+// for field. There is no separate top-level "weights" object — a field's
+// ceiling is the highest value in its own point map (or band list); see the
+// backend module's docstring for why duplicating that as an independent
+// number would let the two disagree.
+
+export interface EmployeeCountBand {
+  min_employees: number;
+  max_employees: number;
+  points: number;
+}
+
+export interface ICPProfileConfig {
+  qualify_threshold: number;
+  reject_threshold: number;
+  employee_count_bands: EmployeeCountBand[];
+  industry_points: Record<string, number>;
+  seniority_points: Record<string, number>;
+  function_points: Record<string, number>;
+  buying_intent_weight: number;
+  trigger_event_weight: number;
+  /** Advisory only — no evidence field supplies geography today, so this
+   * never affects scoring. Never render it as a filter. */
+  target_geographies: string[];
+  disqualifier_enabled: boolean;
+}
+
+export interface ICPProfile {
+  profile_id: string;
+  organization_id: string;
+  version: number;
+  name: string;
+  config: ICPProfileConfig;
+  scorer_version: string;
+  status: "active" | "retired";
+  created_by_user_id: string | null;
+  created_at: string;
+  activated_at: string;
+  retired_at: string | null;
+}
+
+export interface CreateICPProfileRequest {
+  name: string;
+  config: ICPProfileConfig;
+}
+
+// -------------------------------------------------------------- batches --
+//
+// Productization M3. Mirrors `arie.api.schemas.Batch*Response` field for
+// field. Cost fields are unlabelled numbers here too — see
+// `providerMode.ts`'s `costCaveat()` for the wording every screen reuses.
+
+export interface BatchProgress {
+  total_rows: number;
+  accepted_rows: number;
+  rejected_rows: number;
+  processing_count: number;
+  qualified_count: number;
+  rejected_lead_count: number;
+  review_count: number;
+  failed_count: number;
+  provider_cost_usd: number;
+  model_cost_usd: number;
+  total_cost_usd: number;
+  is_complete: boolean;
+}
+
+export interface Batch {
+  batch_id: string;
+  organization_id: string;
+  filename: string;
+  total_rows: number;
+  accepted_rows: number;
+  rejected_rows: number;
+  created_by_user_id: string;
+  created_at: string;
+  progress: BatchProgress;
+}
+
+export interface BatchRow {
+  batch_id: string;
+  row_number: number;
+  raw_row: Record<string, string>;
+  validation_status: "accepted" | "rejected";
+  validation_error: string | null;
+  lead_id: string | null;
+  lead_status: LeadStatus | null;
+}
+
+export interface BatchRowsPage {
+  items: BatchRow[];
+  limit: number;
+  offset: number;
+  total: number;
+}
+
+// ---------------------------------------------------------------- usage --
+
+export interface UsageSummary {
+  from_at: string;
+  to_at: string;
+  leads_processed: number;
+  qualified_count: number;
+  rejected_count: number;
+  review_count: number;
+  pending_count: number;
+  failed_count: number;
+  provider_calls: number;
+  cache_hits: number;
+  provider_cost_usd: number;
+  model_cost_usd: number;
+  total_cost_usd: number;
 }

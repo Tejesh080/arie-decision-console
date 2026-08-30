@@ -33,7 +33,13 @@ function makeReceipt(overrides: Partial<ReceiptResponse> = {}): ReceiptResponse 
       tau: 0.8,
     },
     stopping: { reason_code: "all_providers_called", explanation: "Every provider was called." },
-    versions: { policy: "calibrated_bounds", scorer: "icp-1.0.0", confidence_calibration: "platt" },
+    versions: {
+      policy: "calibrated_bounds",
+      scorer: "icp-1.0.0",
+      confidence_calibration: "platt",
+      icp_profile_id: null,
+      icp_profile_version: null,
+    },
     cost: {
       provider_cost_usd: "1.00",
       model_cost_usd: "0",

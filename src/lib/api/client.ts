@@ -36,12 +36,18 @@ async function request<T>(
     else externalSignal.addEventListener("abort", () => controller.abort(), { once: true });
   }
 
+  // A `FormData` body must never get an explicit `Content-Type` — the
+  // browser sets `multipart/form-data; boundary=...` itself from the
+  // `FormData` object, and a forced `application/json` here would corrupt
+  // the encoding the server-side proxy then tries to parse.
+  const isForm = init.body instanceof FormData;
+
   let response: Response;
   try {
     response = await fetch(`/api/arie${path}`, {
       ...init,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...init.headers },
+      headers: isForm ? init.headers : { "Content-Type": "application/json", ...init.headers },
     });
   } catch (cause) {
     clearTimeout(timeout);
@@ -85,4 +91,8 @@ export const apiClient = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { method: "GET" }, options),
   post: <T>(path: string, body: unknown, options?: RequestOptions) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }, options),
+  /** For a multipart upload (`POST /batches`) — see `isForm` above for why
+   * this bypasses the default JSON `Content-Type`. */
+  postForm: <T>(path: string, form: FormData, options?: RequestOptions) =>
+    request<T>(path, { method: "POST", body: form }, options),
 };

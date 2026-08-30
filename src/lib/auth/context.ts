@@ -19,7 +19,18 @@ import { createClient } from "@/lib/supabase/server";
 export type AuthContext =
   | { state: "unauthenticated" }
   | { state: "no_organization"; userId: string }
-  | { state: "authorized"; userId: string; accessToken: string; organizationId: string };
+  | {
+      state: "authorized";
+      userId: string;
+      accessToken: string;
+      organizationId: string;
+      /** Productization M3. Server Components use this to decide what to
+       * render (e.g. the ICP configuration edit form is owner/admin-only) —
+       * it is never sent to the backend, which derives its own authorization
+       * from the JWT independently (`arie.auth.AuthContext.is_org_admin`).
+       * A UI check here is a courtesy, not the real gate. */
+      role: string;
+    };
 
 /**
  * `getUser()` (not `getSession()`) verifies the session against Supabase's
@@ -47,7 +58,7 @@ export async function resolveAuthContext(): Promise<AuthContext> {
   // would be unused UI, not a feature.
   const { data: memberships, error } = await supabase
     .from("organization_members")
-    .select("organization_id")
+    .select("organization_id, role")
     .eq("user_id", user.id)
     .eq("status", "active")
     .order("created_at", { ascending: true })
@@ -64,12 +75,14 @@ export async function resolveAuthContext(): Promise<AuthContext> {
   }
 
   const organizationId = memberships?.[0]?.organization_id as string | undefined;
-  if (!organizationId) return { state: "no_organization", userId: user.id };
+  const role = memberships?.[0]?.role as string | undefined;
+  if (!organizationId || !role) return { state: "no_organization", userId: user.id };
 
   return {
     state: "authorized",
     userId: user.id,
     accessToken: session.access_token,
     organizationId,
+    role,
   };
 }

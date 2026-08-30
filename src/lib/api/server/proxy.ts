@@ -85,6 +85,56 @@ export async function proxyToArie(
   }
 }
 
+/**
+ * Forwards a multipart upload (`POST /batches`) as-is. Separate from
+ * `proxyToArie` because a `FormData` body must never be JSON-stringified or
+ * given an explicit `Content-Type` — `fetch` derives the correct
+ * `multipart/form-data; boundary=...` header from the `FormData` object
+ * itself, exactly as the browser did for the incoming request this
+ * forwards.
+ */
+export async function proxyFormToArie(
+  backendPath: string,
+  formData: FormData,
+  auth: ArieAuthHeaders,
+): Promise<NextResponse> {
+  const url = `${backendBaseUrl()}${backendPath}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+        "X-Organization-Id": auth.organizationId,
+      },
+      body: formData,
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeout);
+
+    const text = await response.text();
+    const body = text ? safeJsonParse(text) : null;
+    return NextResponse.json(body, { status: response.status });
+  } catch (cause) {
+    clearTimeout(timeout);
+    const aborted = controller.signal.aborted;
+    return NextResponse.json(
+      {
+        error: "backend_unreachable",
+        message: aborted
+          ? `ARIE backend at ${backendBaseUrl()} did not respond in time.`
+          : `Could not reach the ARIE backend at ${backendBaseUrl()}. Is it running? ` +
+            `(docker compose up -d in the arie-b2b-enrichment-engine repo)`,
+        cause: cause instanceof Error ? cause.message : String(cause),
+      },
+      { status: 502 },
+    );
+  }
+}
+
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);

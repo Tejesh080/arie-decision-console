@@ -1,6 +1,12 @@
 import { ArieConflictError, ArieNotFoundError, ArieValidationError } from "../errors";
 import type {
+  Batch,
+  BatchRow,
+  BatchRowsPage,
+  CreateICPProfileRequest,
   HealthResponse,
+  ICPProfile,
+  ICPProfileConfig,
   IngestLeadRequest,
   IngestLeadResponse,
   LeadResponse,
@@ -9,6 +15,7 @@ import type {
   ReviewDecisionRequest,
   ReviewDecisionResponse,
   ReviewResponse,
+  UsageSummary,
 } from "../types";
 
 /**
@@ -27,6 +34,57 @@ import type {
  */
 
 const STORAGE_KEY = "arie-web:mock-store:v1";
+
+// --- Productization M3: ICP profiles, batches, usage (mock, in-memory) ----
+//
+// Not persisted to localStorage like the lead store above — a page reload
+// resetting these is an acceptable simplification for mock mode, which
+// exists for screenshots/demo/UI work, not for exercising cross-session
+// durability (the real backend's integration suite already covers that).
+
+const REFERENCE_ICP_CONFIG: ICPProfileConfig = {
+  qualify_threshold: 65,
+  reject_threshold: 55,
+  employee_count_bands: [
+    { min_employees: 1, max_employees: 10, points: 2 },
+    { min_employees: 11, max_employees: 50, points: 10 },
+    { min_employees: 51, max_employees: 200, points: 20 },
+    { min_employees: 201, max_employees: 1000, points: 18 },
+    { min_employees: 1001, max_employees: 1_000_000_000, points: 8 },
+  ],
+  industry_points: {
+    software: 15,
+    fintech: 15,
+    healthtech: 13,
+    ecommerce: 12,
+    logistics: 8,
+    manufacturing: 7,
+    education: 5,
+    nonprofit: 2,
+  },
+  seniority_points: { c_level: 20, vp: 18, director: 14, manager: 8, ic: 2 },
+  function_points: {
+    data: 15,
+    engineering: 14,
+    operations: 9,
+    marketing: 5,
+    sales: 5,
+    finance: 4,
+    other: 2,
+  },
+  buying_intent_weight: 20,
+  trigger_event_weight: 10,
+  target_geographies: [],
+  disqualifier_enabled: true,
+};
+
+export interface MockCsvRow {
+  email: string;
+  full_name?: string;
+  company_name?: string;
+  company_domain?: string;
+  title?: string;
+}
 
 // Stage boundaries, ms since creation -- purely cosmetic pacing so the
 // processing states in the New Lead flow are visible rather than instant.
@@ -312,6 +370,23 @@ function isSettled(lead: MockLead, nowMs: number): boolean {
 
 class MockArieStore {
   private store: StoreShape | null = null;
+  private icpProfiles: ICPProfile[] = [
+    {
+      profile_id: "mock-icp-1",
+      organization_id: "mock-org",
+      version: 1,
+      name: "Reference ICP",
+      config: REFERENCE_ICP_CONFIG,
+      scorer_version: "icp-1.0.0",
+      status: "active",
+      created_by_user_id: null,
+      created_at: new Date(0).toISOString(),
+      activated_at: new Date(0).toISOString(),
+      retired_at: null,
+    },
+  ];
+  private batches: Batch[] = [];
+  private batchRows = new Map<string, BatchRow[]>();
 
   private get(): StoreShape {
     if (!this.store) this.store = loadStore();
@@ -520,6 +595,10 @@ class MockArieStore {
         policy: "calibrated_bounds",
         scorer: "icp-1.0.0",
         confidence_calibration: "platt",
+        // Mock mode predates organization ICP profiles — always the
+        // reference config, so there is no profile id to name.
+        icp_profile_id: null,
+        icp_profile_version: null,
       },
       cost: {
         provider_cost_usd: providerCost,
@@ -649,6 +728,160 @@ class MockArieStore {
 
   getHealth(): HealthResponse {
     return { status: "ok", database: true, schema_ready: true };
+  }
+
+  // ------------------------------------------------------- ICP profiles --
+
+  getActiveICPProfile(): ICPProfile {
+    const active = this.icpProfiles.find((p) => p.status === "active");
+    if (!active) throw new ArieNotFoundError("this organization has no active ICP profile");
+    return active;
+  }
+
+  listICPVersions(): ICPProfile[] {
+    return [...this.icpProfiles].sort((a, b) => b.version - a.version);
+  }
+
+  getICPVersion(version: number): ICPProfile {
+    const found = this.icpProfiles.find((p) => p.version === version);
+    if (!found) throw new ArieNotFoundError(`no ICP profile version ${version}`);
+    return found;
+  }
+
+  createICPProfile(request: CreateICPProfileRequest): ICPProfile {
+    if (!request.name.trim()) throw new ArieValidationError("name is required");
+    const nextVersion = Math.max(0, ...this.icpProfiles.map((p) => p.version)) + 1;
+    const now = new Date().toISOString();
+    this.icpProfiles = this.icpProfiles.map((p) =>
+      p.status === "active" ? { ...p, status: "retired" as const, retired_at: now } : p,
+    );
+    const created: ICPProfile = {
+      profile_id: `mock-icp-${nextVersion}`,
+      organization_id: "mock-org",
+      version: nextVersion,
+      name: request.name,
+      config: request.config,
+      scorer_version: "icp-1.0.0",
+      status: "active",
+      created_by_user_id: "mock-user",
+      created_at: now,
+      activated_at: now,
+      retired_at: null,
+    };
+    this.icpProfiles = [...this.icpProfiles, created];
+    return created;
+  }
+
+  // ------------------------------------------------------------ batches --
+
+  uploadBatch(filename: string, rows: MockCsvRow[]): Batch {
+    if (rows.length === 0) throw new ArieValidationError("file has no data rows");
+    const batchId = `mock-batch-${Math.random().toString(36).slice(2, 10)}`;
+    const records: BatchRow[] = rows.map((row, index) => {
+      const valid = typeof row.email === "string" && row.email.includes("@");
+      const leadId = valid ? `mock-lead-${batchId}-${index}` : null;
+      return {
+        batch_id: batchId,
+        row_number: index + 1,
+        raw_row: row as unknown as Record<string, string>,
+        validation_status: valid ? "accepted" : "rejected",
+        validation_error: valid ? null : "email is required or unrecognizable",
+        lead_id: leadId,
+        lead_status: valid ? "AUTO_ROUTED" : null,
+      };
+    });
+    const acceptedRows = records.filter((r) => r.validation_status === "accepted").length;
+    const rejectedRows = records.length - acceptedRows;
+    const providerCost = acceptedRows * 0.0016;
+
+    const batch: Batch = {
+      batch_id: batchId,
+      organization_id: "mock-org",
+      filename,
+      total_rows: records.length,
+      accepted_rows: acceptedRows,
+      rejected_rows: rejectedRows,
+      created_by_user_id: "mock-user",
+      created_at: new Date().toISOString(),
+      progress: {
+        total_rows: records.length,
+        accepted_rows: acceptedRows,
+        rejected_rows: rejectedRows,
+        processing_count: 0,
+        qualified_count: acceptedRows,
+        rejected_lead_count: 0,
+        review_count: 0,
+        failed_count: 0,
+        provider_cost_usd: providerCost,
+        model_cost_usd: 0,
+        total_cost_usd: providerCost,
+        is_complete: true,
+      },
+    };
+    this.batchRows.set(batchId, records);
+    this.batches = [batch, ...this.batches];
+    return batch;
+  }
+
+  listBatches(): Batch[] {
+    return this.batches;
+  }
+
+  getBatch(batchId: string): Batch {
+    const found = this.batches.find((b) => b.batch_id === batchId);
+    if (!found) throw new ArieNotFoundError(`no batch ${batchId}`);
+    return found;
+  }
+
+  listBatchRows(batchId: string): BatchRowsPage {
+    if (!this.batches.some((b) => b.batch_id === batchId)) {
+      throw new ArieNotFoundError(`no batch ${batchId}`);
+    }
+    const rows = this.batchRows.get(batchId) ?? [];
+    return { items: rows, limit: Math.max(rows.length, 1), offset: 0, total: rows.length };
+  }
+
+  // -------------------------------------------------------------- usage --
+
+  getUsage(): UsageSummary {
+    const now = new Date();
+    const totals = this.batches.reduce(
+      (acc, b) => ({
+        leads: acc.leads + b.total_rows,
+        qualified: acc.qualified + b.progress.qualified_count,
+        rejected: acc.rejected + b.progress.rejected_lead_count,
+        review: acc.review + b.progress.review_count,
+        pending: acc.pending + b.progress.processing_count,
+        failed: acc.failed + b.progress.failed_count,
+        calls: acc.calls + b.accepted_rows,
+        providerCost: acc.providerCost + b.progress.provider_cost_usd,
+      }),
+      {
+        leads: 0,
+        qualified: 0,
+        rejected: 0,
+        review: 0,
+        pending: 0,
+        failed: 0,
+        calls: 0,
+        providerCost: 0,
+      },
+    );
+    return {
+      from_at: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      to_at: now.toISOString(),
+      leads_processed: totals.leads,
+      qualified_count: totals.qualified,
+      rejected_count: totals.rejected,
+      review_count: totals.review,
+      pending_count: totals.pending,
+      failed_count: totals.failed,
+      provider_calls: totals.calls,
+      cache_hits: 0,
+      provider_cost_usd: totals.providerCost,
+      model_cost_usd: 0,
+      total_cost_usd: totals.providerCost,
+    };
   }
 }
 
