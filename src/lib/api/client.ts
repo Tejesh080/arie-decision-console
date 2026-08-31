@@ -91,6 +91,12 @@ export const apiClient = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { method: "GET" }, options),
   post: <T>(path: string, body: unknown, options?: RequestOptions) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }, options),
+  patch: <T>(path: string, body: unknown, options?: RequestOptions) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(body) }, options),
+  put: <T>(path: string, body: unknown, options?: RequestOptions) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(body) }, options),
+  delete: <T>(path: string, options?: RequestOptions) =>
+    request<T>(path, { method: "DELETE" }, options),
   /** For a multipart upload (`POST /batches`) — see `isForm` above for why
    * this bypasses the default JSON `Content-Type`. */
   postForm: <T>(path: string, form: FormData, options?: RequestOptions) =>

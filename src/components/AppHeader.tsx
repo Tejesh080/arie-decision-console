@@ -17,13 +17,21 @@ import { SignOutButton } from "./SignOutButton";
  * "Review queue" link could only ever 404 or lie. Batches, ICP configuration,
  * and usage are all genuinely listable now, so those three earn a spot; a
  * global lead list still isn't, so it still isn't here.
+ *
+ * Productization M4 adds Settings (organization/members/invitations),
+ * Providers (BYOK), and Onboarding — all backed by real, listable endpoints
+ * (`/organization`, `/organization/members`, `/organization/providers`,
+ * `/organization/onboarding`), same bar as everything above.
  */
 const NAV = [
   { href: "/", label: "Overview" },
   { href: "/leads/new", label: "New lead" },
   { href: "/batches", label: "Batches" },
   { href: "/icp", label: "ICP" },
+  { href: "/providers", label: "Providers" },
   { href: "/usage", label: "Usage" },
+  { href: "/onboarding", label: "Onboarding" },
+  { href: "/settings", label: "Settings" },
 ] as const;
 
 export function AppHeader() {

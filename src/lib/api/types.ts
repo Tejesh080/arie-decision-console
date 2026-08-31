@@ -407,3 +407,163 @@ export interface UsageSummary {
   model_cost_usd: number;
   total_cost_usd: number;
 }
+
+// -------------------------------------------------------- organization --
+//
+// Productization M4. Mirrors `arie.api.schemas.OrganizationResponse` /
+// `UpdateOrganizationRequest` field for field.
+
+export interface OrganizationResponse {
+  organization_id: string;
+  name: string;
+  slug: string;
+  status: string;
+  timezone: string;
+  company_domain: string | null;
+  onboarding_completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateOrganizationRequest {
+  name?: string;
+  timezone?: string;
+  /** Explicit `null` clears it; omit to leave unchanged. */
+  company_domain?: string | null;
+}
+
+// -------------------------------------------------------------- members --
+//
+// Mirrors `arie.api.schemas.MemberResponse` / `UpdateMemberRoleRequest`.
+// Membership rows are created only via invitation acceptance — there is no
+// direct "add member" endpoint.
+
+/** `arie.auth.ROLES` — the only values `role` may take anywhere in M4. */
+export const ROLES = ["owner", "admin", "analyst_reviewer"] as const;
+export type Role = (typeof ROLES)[number];
+
+export interface MemberResponse {
+  organization_id: string;
+  user_id: string;
+  role: string;
+  status: "active" | "removed";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateMemberRoleRequest {
+  role: string;
+}
+
+// --------------------------------------------------------- invitations --
+//
+// Mirrors `arie.api.schemas.InvitationResponse` / `InvitationCreatedResponse`
+// / `CreateInvitationRequest` / `AcceptInvitationRequest`.
+
+export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired";
+
+export interface InvitationResponse {
+  invitation_id: string;
+  organization_id: string;
+  email_normalized: string;
+  role: string;
+  status: InvitationStatus;
+  invited_by_user_id: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+}
+
+/** Only ever returned once, at creation — `raw_token` is never retrievable
+ * again afterward. Never persist this beyond the moment it's shown. */
+export interface InvitationCreatedResponse extends InvitationResponse {
+  raw_token: string;
+}
+
+export interface CreateInvitationRequest {
+  email: string;
+  role: string;
+}
+
+export interface AcceptInvitationRequest {
+  token: string;
+}
+
+// ----------------------------------------------------------- providers --
+//
+// Mirrors `arie.api.schemas.ProviderStatusResponse` /
+// `SetProviderCredentialRequest` / `SetProviderEnabledRequest`. Never carries
+// a raw credential — `ProviderStatus` on the backend structurally cannot hold
+// one (see `arie.provider_configs`).
+
+/** `arie.live.providers` registered live provider identifiers — the exact
+ * `{provider}` path-parameter values the API expects, cheapest-first. Do not
+ * add providers here that the backend doesn't support. */
+export const SUPPORTED_PROVIDERS = [
+  "abstract_company_enrichment",
+  "hunter_combined_enrichment",
+  "apollo_person_enrichment",
+] as const;
+export type ProviderId = (typeof SUPPORTED_PROVIDERS)[number];
+
+export const PROVIDER_DISPLAY_NAMES: Record<ProviderId, string> = {
+  abstract_company_enrichment: "Abstract",
+  hunter_combined_enrichment: "Hunter",
+  apollo_person_enrichment: "Apollo",
+};
+
+export interface ProviderStatusResponse {
+  provider: string;
+  configured: boolean;
+  enabled: boolean;
+  updated_at: string | null;
+  last_tested_at: string | null;
+  last_test_status: "success" | "failure" | null;
+  /** Sanitized classification only (e.g. "authentication_failed:401") —
+   * never a raw provider response, URL, or credential. */
+  last_test_error: string | null;
+}
+
+export interface SetProviderCredentialRequest {
+  credential: string;
+}
+
+export interface SetProviderEnabledRequest {
+  enabled: boolean;
+}
+
+// ---------------------------------------------------------- onboarding --
+//
+// Mirrors `arie.api.schemas.OnboardingStatusResponse`. `provider_configured`
+// is deliberately excluded from `completed` — BYOK is optional while
+// PROVIDER_MODE stays simulated.
+
+export interface OnboardingStatusResponse {
+  account_created: boolean;
+  organization_configured: boolean;
+  icp_configured: boolean;
+  provider_configured: boolean;
+  first_upload_completed: boolean;
+  first_batch_processed: boolean;
+  completed: boolean;
+  completed_at: string | null;
+}
+
+// --------------------------------------------------------------- limits --
+//
+// Mirrors `arie.api.schemas.UsageAgainstLimitsResponse`. `modeled_spend_*`
+// fields are real ledger arithmetic over configured provider rates, never
+// billed vendor spend — reuse `costCaveat()`'s wording, never "billed".
+
+export interface UsageAgainstLimitsResponse {
+  leads_used: number;
+  leads_limit: number;
+  leads_remaining: number;
+  modeled_spend_used_usd: number;
+  modeled_spend_limit_usd: number;
+  modeled_spend_remaining_usd: number;
+  max_csv_rows_per_upload: number;
+  period_start: string;
+  period_end: string;
+}

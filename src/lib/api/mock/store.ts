@@ -1,22 +1,37 @@
-import { ArieConflictError, ArieNotFoundError, ArieValidationError } from "../errors";
+import { ArieApiError, ArieConflictError, ArieNotFoundError, ArieValidationError } from "../errors";
 import type {
+  AcceptInvitationRequest,
   Batch,
   BatchRow,
   BatchRowsPage,
   CreateICPProfileRequest,
+  CreateInvitationRequest,
   HealthResponse,
   ICPProfile,
   ICPProfileConfig,
   IngestLeadRequest,
   IngestLeadResponse,
+  InvitationCreatedResponse,
+  InvitationResponse,
   LeadResponse,
   LeadStatus,
+  MemberResponse,
+  OnboardingStatusResponse,
+  OrganizationResponse,
+  ProviderId,
+  ProviderStatusResponse,
   ReceiptResponse,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
   ReviewResponse,
+  SetProviderCredentialRequest,
+  SetProviderEnabledRequest,
+  UpdateMemberRoleRequest,
+  UpdateOrganizationRequest,
+  UsageAgainstLimitsResponse,
   UsageSummary,
 } from "../types";
+import { ROLES, SUPPORTED_PROVIDERS } from "../types";
 
 /**
  * Mock mode's entire "backend" — no network, no Docker. Exists for
@@ -368,12 +383,14 @@ function isSettled(lead: MockLead, nowMs: number): boolean {
   return nowMs - lead.createdAtMs >= STAGE_BOUNDS_MS.SETTLED;
 }
 
-class MockArieStore {
-  private store: StoreShape | null = null;
-  private icpProfiles: ICPProfile[] = [
+const MOCK_USER_ID = "mock-user";
+const MOCK_ORG_ID = "mock-org";
+
+function defaultICPProfiles(): ICPProfile[] {
+  return [
     {
       profile_id: "mock-icp-1",
-      organization_id: "mock-org",
+      organization_id: MOCK_ORG_ID,
       version: 1,
       name: "Reference ICP",
       config: REFERENCE_ICP_CONFIG,
@@ -385,8 +402,94 @@ class MockArieStore {
       retired_at: null,
     },
   ];
+}
+
+function defaultOrganization(): OrganizationResponse {
+  return {
+    organization_id: MOCK_ORG_ID,
+    name: "Acme Revenue Team",
+    slug: "acme-revenue-team",
+    status: "active",
+    timezone: "America/New_York",
+    company_domain: "acme.example",
+    onboarding_completed_at: null,
+    created_at: new Date(0).toISOString(),
+    updated_at: new Date(0).toISOString(),
+  };
+}
+
+// The mock's "current user" is an admin, not the owner — deliberately, so
+// the last-owner protection below is actually exercisable. Self can never
+// act on its own membership (`CannotActOnSelfError`), so if self were the
+// sole owner, the last-owner guard would be permanently unreachable from
+// this store's public surface.
+function defaultMembers(): MemberResponse[] {
+  return [
+    {
+      organization_id: MOCK_ORG_ID,
+      user_id: MOCK_USER_ID,
+      role: "admin",
+      status: "active",
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    },
+    {
+      organization_id: MOCK_ORG_ID,
+      user_id: "mock-owner",
+      role: "owner",
+      status: "active",
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    },
+    {
+      organization_id: MOCK_ORG_ID,
+      user_id: "mock-analyst",
+      role: "analyst_reviewer",
+      status: "active",
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    },
+  ];
+}
+
+function defaultProviders(): Record<ProviderId, ProviderStatusResponse> {
+  return Object.fromEntries(
+    SUPPORTED_PROVIDERS.map((provider) => [
+      provider,
+      {
+        provider,
+        configured: false,
+        enabled: false,
+        updated_at: null,
+        last_tested_at: null,
+        last_test_status: null,
+        last_test_error: null,
+      },
+    ]),
+  ) as Record<ProviderId, ProviderStatusResponse>;
+}
+
+class MockArieStore {
+  private store: StoreShape | null = null;
+  private icpProfiles: ICPProfile[] = defaultICPProfiles();
   private batches: Batch[] = [];
   private batchRows = new Map<string, BatchRow[]>();
+
+  // --- Productization M4: organization, members, invitations, providers,
+  // onboarding, limits (mock, in-memory) --------------------------------
+  //
+  // Mock mode has no real Supabase session (see ICPPage's docstring) — every
+  // action below is treated as permitted, matching every other mock-mode
+  // screen's "no auth wall" behaviour. All reset to their `defaultX()` value
+  // by `resetForTests()`, same as `store`/`icpProfiles`/`batches` above.
+
+  private readonly mockUserId = MOCK_USER_ID;
+  private readonly mockOrgId = MOCK_ORG_ID;
+
+  private organization: OrganizationResponse = defaultOrganization();
+  private members: MemberResponse[] = defaultMembers();
+  private invitations: InvitationResponse[] = [];
+  private providers: Record<ProviderId, ProviderStatusResponse> = defaultProviders();
 
   private get(): StoreShape {
     if (!this.store) this.store = loadStore();
@@ -398,11 +501,21 @@ class MockArieStore {
   }
 
   /** Drops the in-memory cache so the next call reloads from (now-cleared)
-   * localStorage. Exists for test isolation between cases in the same
-   * module instance — `vi.resetModules()` would otherwise also reset the
-   * error classes tests import statically, breaking `instanceof` checks. */
+   * localStorage, and resets every other piece of mutable state back to its
+   * constructor-time default. Exists for test isolation between cases in
+   * the same module instance — `vi.resetModules()` would otherwise also
+   * reset the error classes tests import statically, breaking `instanceof`
+   * checks. */
   resetForTests(): void {
     this.store = null;
+    this.icpProfiles = defaultICPProfiles();
+    this.batches = [];
+    this.batchRows = new Map();
+    this.organization = defaultOrganization();
+    this.members = defaultMembers();
+    this.invitations = [];
+    this.invitationTokens = new Map();
+    this.providers = defaultProviders();
   }
 
   createLead(input: IngestLeadRequest): IngestLeadResponse {
@@ -881,6 +994,298 @@ class MockArieStore {
       provider_cost_usd: totals.providerCost,
       model_cost_usd: 0,
       total_cost_usd: totals.providerCost,
+    };
+  }
+
+  // -------------------------------------------------------- organization --
+
+  getOrganization(): OrganizationResponse {
+    return this.organization;
+  }
+
+  updateOrganization(request: UpdateOrganizationRequest): OrganizationResponse {
+    if (
+      request.name === undefined &&
+      request.timezone === undefined &&
+      request.company_domain === undefined
+    ) {
+      throw new ArieValidationError("at least one field must be provided");
+    }
+    if (request.name !== undefined && !request.name.trim()) {
+      throw new ArieValidationError("name must not be empty");
+    }
+    this.organization = {
+      ...this.organization,
+      ...(request.name !== undefined ? { name: request.name } : {}),
+      ...(request.timezone !== undefined ? { timezone: request.timezone } : {}),
+      ...(request.company_domain !== undefined
+        ? { company_domain: request.company_domain }
+        : {}),
+      updated_at: new Date().toISOString(),
+    };
+    return this.organization;
+  }
+
+  // ------------------------------------------------------------- members --
+
+  listMembers(): MemberResponse[] {
+    return this.members.filter((m) => m.status === "active");
+  }
+
+  private countActiveOwners(): number {
+    return this.members.filter((m) => m.status === "active" && m.role === "owner").length;
+  }
+
+  updateMemberRole(userId: string, request: UpdateMemberRoleRequest): MemberResponse {
+    if (!ROLES.includes(request.role as (typeof ROLES)[number])) {
+      throw new ArieValidationError(`unknown role '${request.role}'`);
+    }
+    if (userId === this.mockUserId) {
+      throw new ArieConflictError("cannot change your own role");
+    }
+    const member = this.members.find((m) => m.user_id === userId && m.status === "active");
+    if (!member) throw new ArieNotFoundError("member not found");
+    if (member.role === "owner" && request.role !== "owner" && this.countActiveOwners() <= 1) {
+      throw new ArieConflictError("cannot demote the organization's only remaining owner");
+    }
+    member.role = request.role;
+    member.updated_at = new Date().toISOString();
+    return member;
+  }
+
+  removeMember(userId: string): MemberResponse {
+    if (userId === this.mockUserId) {
+      throw new ArieConflictError("cannot remove yourself");
+    }
+    const member = this.members.find((m) => m.user_id === userId && m.status === "active");
+    if (!member) throw new ArieNotFoundError("member not found");
+    if (member.role === "owner" && this.countActiveOwners() <= 1) {
+      throw new ArieConflictError("cannot remove the organization's only remaining owner");
+    }
+    member.status = "removed";
+    member.updated_at = new Date().toISOString();
+    return member;
+  }
+
+  // --------------------------------------------------------- invitations --
+  //
+  // Mirrors the backend's own "raw token shown once, only a hash persisted"
+  // shape: `this.invitations` never carries `raw_token` past the moment
+  // `createInvitation` returns it, matching `InvitationResponse`. This
+  // separate map is the mock's stand-in for `token_hash` lookups.
+
+  private invitationTokens = new Map<string, string>();
+
+  listInvitations(): InvitationResponse[] {
+    return [...this.invitations].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+
+  createInvitation(request: CreateInvitationRequest): InvitationCreatedResponse {
+    if (!ROLES.includes(request.role as (typeof ROLES)[number])) {
+      throw new ArieValidationError(`unknown role '${request.role}'`);
+    }
+    const emailNormalized = request.email.trim().toLowerCase();
+    if (!emailNormalized || !emailNormalized.includes("@")) {
+      throw new ArieValidationError("email must be a valid address");
+    }
+    const duplicate = this.invitations.find(
+      (i) => i.email_normalized === emailNormalized && i.status === "pending",
+    );
+    if (duplicate) {
+      throw new ArieConflictError(`a pending invitation already exists for ${emailNormalized}`);
+    }
+    const now = new Date();
+    const rawToken = `mock_${crypto.randomUUID().replace(/-/g, "")}`;
+    const invitationId = crypto.randomUUID();
+    const base: InvitationResponse = {
+      invitation_id: invitationId,
+      organization_id: this.mockOrgId,
+      email_normalized: emailNormalized,
+      role: request.role,
+      status: "pending",
+      invited_by_user_id: this.mockUserId,
+      created_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      accepted_at: null,
+      revoked_at: null,
+    };
+    this.invitations = [...this.invitations, base];
+    this.invitationTokens.set(invitationId, rawToken);
+    return { ...base, raw_token: rawToken };
+  }
+
+  revokeInvitation(invitationId: string): InvitationResponse {
+    const invitation = this.invitations.find(
+      (i) => i.invitation_id === invitationId && i.status === "pending",
+    );
+    if (!invitation) throw new ArieNotFoundError("invitation not found");
+    invitation.status = "revoked";
+    invitation.revoked_at = new Date().toISOString();
+    return invitation;
+  }
+
+  /** Mock mode has no verified-identity flow to check an email against — it
+   * accepts any live, pending token and creates a fabricated new member.
+   * Expiry/replay are still honestly simulated since both are pure
+   * functions of the invitation record. */
+  acceptInvitation(request: AcceptInvitationRequest): InvitationResponse {
+    const invitationId = [...this.invitationTokens.entries()].find(
+      ([, token]) => token === request.token,
+    )?.[0];
+    const invitation = this.invitations.find(
+      (i) => i.invitation_id === (invitationId ?? request.token),
+    );
+    if (!invitation || invitation.status !== "pending") {
+      throw new ArieNotFoundError("invitation not found");
+    }
+    if (new Date(invitation.expires_at).getTime() < Date.now()) {
+      invitation.status = "expired";
+      throw new ArieApiError(`invitation ${invitation.invitation_id} has expired`, 410);
+    }
+    invitation.status = "accepted";
+    invitation.accepted_at = new Date().toISOString();
+    this.members = [
+      ...this.members.filter((m) => m.user_id !== "mock-invited-user"),
+      {
+        organization_id: this.mockOrgId,
+        user_id: "mock-invited-user",
+        role: invitation.role,
+        status: "active",
+        created_at: invitation.accepted_at,
+        updated_at: invitation.accepted_at,
+      },
+    ];
+    return invitation;
+  }
+
+  // ----------------------------------------------------------- providers --
+
+  listProviders(): ProviderStatusResponse[] {
+    return SUPPORTED_PROVIDERS.map((provider) => this.providers[provider]);
+  }
+
+  private requireProvider(provider: string): ProviderId {
+    if (!SUPPORTED_PROVIDERS.includes(provider as ProviderId)) {
+      throw new ArieNotFoundError(`unknown provider '${provider}'`);
+    }
+    return provider as ProviderId;
+  }
+
+  getProvider(provider: string): ProviderStatusResponse {
+    return this.providers[this.requireProvider(provider)];
+  }
+
+  setProviderCredential(
+    provider: string,
+    request: SetProviderCredentialRequest,
+  ): ProviderStatusResponse {
+    const id = this.requireProvider(provider);
+    if (!request.credential.trim()) throw new ArieValidationError("credential must not be empty");
+    this.providers[id] = {
+      ...this.providers[id],
+      configured: true,
+      enabled: true,
+      updated_at: new Date().toISOString(),
+      last_tested_at: null,
+      last_test_status: null,
+      last_test_error: null,
+    };
+    return this.providers[id];
+  }
+
+  setProviderEnabled(provider: string, request: SetProviderEnabledRequest): ProviderStatusResponse {
+    const id = this.requireProvider(provider);
+    if (!this.providers[id].configured) {
+      throw new ArieNotFoundError(`${id} has not been configured for this organization`);
+    }
+    this.providers[id] = { ...this.providers[id], enabled: request.enabled };
+    return this.providers[id];
+  }
+
+  removeProviderCredential(provider: string): void {
+    const id = this.requireProvider(provider);
+    if (!this.providers[id].configured) {
+      throw new ArieNotFoundError(`${id} has not been configured for this organization`);
+    }
+    this.providers[id] = {
+      provider: id,
+      configured: false,
+      enabled: false,
+      updated_at: null,
+      last_tested_at: null,
+      last_test_status: null,
+      last_test_error: null,
+    };
+  }
+
+  /** Deterministic per-provider outcome, not random — a repeated click in a
+   * demo/screenshot session should behave the same way every time. */
+  testProviderConnection(provider: string): ProviderStatusResponse {
+    const id = this.requireProvider(provider);
+    if (!this.providers[id].configured) {
+      throw new ArieNotFoundError(`${id} has not been configured for this organization`);
+    }
+    this.providers[id] = {
+      ...this.providers[id],
+      last_tested_at: new Date().toISOString(),
+      last_test_status: "success",
+      last_test_error: null,
+    };
+    return this.providers[id];
+  }
+
+  // ---------------------------------------------------------- onboarding --
+
+  getOnboardingStatus(): OnboardingStatusResponse {
+    const icpConfigured = this.icpProfiles.some((p) => p.status === "active");
+    const providerConfigured = SUPPORTED_PROVIDERS.some((p) => this.providers[p].configured);
+    const firstUploadCompleted = this.batches.length > 0;
+    const firstBatchProcessed = this.batches.some((b) => b.progress.is_complete);
+    const completed = icpConfigured && firstUploadCompleted && firstBatchProcessed;
+    if (completed && !this.organization.onboarding_completed_at) {
+      this.organization = {
+        ...this.organization,
+        onboarding_completed_at: new Date().toISOString(),
+      };
+    }
+    return {
+      account_created: true,
+      organization_configured: Boolean(this.organization.name),
+      icp_configured: icpConfigured,
+      provider_configured: providerConfigured,
+      first_upload_completed: firstUploadCompleted,
+      first_batch_processed: firstBatchProcessed,
+      completed,
+      completed_at: this.organization.onboarding_completed_at,
+    };
+  }
+
+  // -------------------------------------------------------------- limits --
+
+  private readonly limits = {
+    maxLeadsPerMonth: 5000,
+    maxCsvRowsPerUpload: 200,
+    maxModeledSpendUsdPerMonth: 50,
+  };
+
+  getUsageAgainstLimits(): UsageAgainstLimitsResponse {
+    const usage = this.getUsage();
+    const now = new Date();
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    return {
+      leads_used: usage.leads_processed,
+      leads_limit: this.limits.maxLeadsPerMonth,
+      leads_remaining: Math.max(0, this.limits.maxLeadsPerMonth - usage.leads_processed),
+      modeled_spend_used_usd: usage.total_cost_usd,
+      modeled_spend_limit_usd: this.limits.maxModeledSpendUsdPerMonth,
+      modeled_spend_remaining_usd: Math.max(
+        0,
+        this.limits.maxModeledSpendUsdPerMonth - usage.total_cost_usd,
+      ),
+      max_csv_rows_per_upload: this.limits.maxCsvRowsPerUpload,
+      period_start: periodStart.toISOString(),
+      period_end: periodEnd.toISOString(),
     };
   }
 }

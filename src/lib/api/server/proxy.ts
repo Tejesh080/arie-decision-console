@@ -31,12 +31,16 @@ function backendBaseUrl(): string {
 
 export interface ArieAuthHeaders {
   accessToken: string;
-  organizationId: string;
+  /** Omitted only for `POST /invitations/accept` — the one route the
+   * backend authorizes off a verified identity with no organization
+   * membership yet (`IdentityDep`, not the usual `AuthDep`), so there is no
+   * organization to scope the request to. */
+  organizationId?: string;
 }
 
 export async function proxyToArie(
   backendPath: string,
-  init: { method: "GET" | "POST"; body?: unknown },
+  init: { method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown },
   auth?: ArieAuthHeaders,
 ): Promise<NextResponse> {
   const url = `${backendBaseUrl()}${backendPath}`;
@@ -52,7 +56,7 @@ export async function proxyToArie(
   // identity at all.
   if (auth) {
     headers["Authorization"] = `Bearer ${auth.accessToken}`;
-    headers["X-Organization-Id"] = auth.organizationId;
+    if (auth.organizationId) headers["X-Organization-Id"] = auth.organizationId;
   }
 
   try {
@@ -102,13 +106,13 @@ export async function proxyFormToArie(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
+  const headers: Record<string, string> = { Authorization: `Bearer ${auth.accessToken}` };
+  if (auth.organizationId) headers["X-Organization-Id"] = auth.organizationId;
+
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${auth.accessToken}`,
-        "X-Organization-Id": auth.organizationId,
-      },
+      headers,
       body: formData,
       signal: controller.signal,
       cache: "no-store",

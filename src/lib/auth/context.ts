@@ -86,3 +86,31 @@ export async function resolveAuthContext(): Promise<AuthContext> {
     role,
   };
 }
+
+/**
+ * A lighter check than `resolveAuthContext` — confirms a verified Supabase
+ * session exists but never looks at `organization_members`. Exists only for
+ * `POST /invitations/accept`, which by design must work for a signed-in user
+ * with *no* organization membership yet (that's the point of accepting one).
+ * `resolveAuthContext` can't be reused there: its `no_organization` branch
+ * deliberately withholds the access token for exactly this reason.
+ */
+export type UserSession =
+  | { state: "unauthenticated" }
+  | { state: "authenticated"; userId: string; accessToken: string };
+
+export async function resolveUserSession(): Promise<UserSession> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { state: "unauthenticated" };
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return { state: "unauthenticated" };
+
+  return { state: "authenticated", userId: user.id, accessToken: session.access_token };
+}

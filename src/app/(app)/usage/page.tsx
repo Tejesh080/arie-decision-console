@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CircleAlert } from "lucide-react";
 import { getUsage } from "@/lib/api/usage";
-import type { UsageSummary } from "@/lib/api/types";
+import { getUsageAgainstLimits } from "@/lib/api/limits";
+import type { UsageAgainstLimitsResponse, UsageSummary } from "@/lib/api/types";
 import { formatDateTime, formatUsd } from "@/lib/format";
 import { costNoun, costCaveat } from "@/lib/api/providerMode";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
@@ -10,7 +12,9 @@ import { StatRow, Stat } from "@/components/ui/Stat";
 
 export default function UsagePage() {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [limits, setLimits] = useState<UsageAgainstLimitsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [limitsError, setLimitsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,6 +30,13 @@ export default function UsagePage() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+    getUsageAgainstLimits()
+      .then((result) => {
+        if (!cancelled) setLimits(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setLimitsError(err instanceof Error ? err.message : String(err));
       });
     return () => {
       cancelled = true;
@@ -89,6 +100,57 @@ export default function UsagePage() {
             </div>
             <p className="mt-4 text-[0.6875rem] leading-relaxed text-text-faint">{costCaveat()}</p>
           </Panel>
+
+          {limitsError && (
+            <p className="flex items-center gap-2 text-sm text-reject">
+              <CircleAlert aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2.25} />
+              {limitsError}
+            </p>
+          )}
+
+          {limits && (
+            <Panel padding="lg" accent={limits.leads_remaining === 0 ? "reject" : undefined}>
+              <Eyebrow>Monthly limits</Eyebrow>
+              <p className="mt-1 text-xs text-text-faint">
+                {formatDateTime(limits.period_start)} – {formatDateTime(limits.period_end)}
+              </p>
+              <div className="mt-4">
+                <StatRow>
+                  <Stat
+                    label="Leads used"
+                    hint={`of ${limits.leads_limit}`}
+                    value={limits.leads_used}
+                    tone={limits.leads_remaining === 0 ? "reject" : "default"}
+                  />
+                  <Stat label="Leads remaining" value={limits.leads_remaining} />
+                  <Stat
+                    label="Modeled spend used"
+                    hint={`of ${formatUsd(limits.modeled_spend_limit_usd, 2)}`}
+                    value={formatUsd(limits.modeled_spend_used_usd, 2)}
+                    tone={limits.modeled_spend_remaining_usd <= 0 ? "reject" : "default"}
+                  />
+                  <Stat
+                    label="Max CSV rows / upload"
+                    value={limits.max_csv_rows_per_upload}
+                  />
+                </StatRow>
+              </div>
+              {(limits.leads_remaining === 0 || limits.modeled_spend_remaining_usd <= 0) && (
+                <p className="mt-4 flex items-center gap-2 rounded-md border border-reject-edge bg-reject-dim px-3 py-2 text-sm text-text">
+                  <CircleAlert
+                    aria-hidden
+                    className="h-4 w-4 shrink-0 text-reject"
+                    strokeWidth={2.25}
+                  />
+                  This organization has reached its monthly quota. New leads and batch uploads
+                  will be rejected until the next period starts.
+                </p>
+              )}
+              <p className="mt-4 text-[0.6875rem] leading-relaxed text-text-faint">
+                Modeled spend is not billed vendor spend — see {costNoun()} above.
+              </p>
+            </Panel>
+          )}
         </div>
       ) : null}
     </div>

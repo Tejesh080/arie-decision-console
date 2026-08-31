@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveAuthContext } from "@/lib/auth/context";
+import { resolveAuthContext, resolveUserSession } from "@/lib/auth/context";
 import type { ArieAuthHeaders } from "./proxy";
 
 /**
@@ -26,4 +26,21 @@ export async function requireAuth(): Promise<
     ok: true,
     auth: { accessToken: context.accessToken, organizationId: context.organizationId },
   };
+}
+
+/**
+ * The gate for `POST /invitations/accept` only — every other `/api/arie/*`
+ * route must keep using `requireAuth`. That endpoint's whole purpose is to
+ * grant a user their first organization membership, so it can't require one
+ * already exist; it only needs a verified Supabase session, matching the
+ * backend's own `IdentityDep` (verified JWT, no org check).
+ */
+export async function requireUserSession(): Promise<
+  { ok: true; accessToken: string } | { ok: false; response: NextResponse }
+> {
+  const session = await resolveUserSession();
+  if (session.state === "unauthenticated") {
+    return { ok: false, response: NextResponse.json({ error: "unauthenticated" }, { status: 401 }) };
+  }
+  return { ok: true, accessToken: session.accessToken };
 }

@@ -248,3 +248,270 @@ describe("mockStore", () => {
     expect(store.getHealth()).toEqual({ status: "ok", database: true, schema_ready: true });
   });
 });
+
+describe("mockStore — Productization M4", () => {
+  beforeEach(() => {
+    resetMockStoreForTests();
+    vi.useFakeTimers();
+    vi.setSystemTime(T0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("organization", () => {
+    it("updates only the fields provided", () => {
+      const store = freshStore();
+      const before = store.getOrganization();
+      const updated = store.updateOrganization({ name: "New Name" });
+      expect(updated.name).toBe("New Name");
+      expect(updated.timezone).toBe(before.timezone);
+      expect(updated.company_domain).toBe(before.company_domain);
+    });
+
+    it("rejects an empty update, matching the backend's model validator", () => {
+      const store = freshStore();
+      expect(() => store.updateOrganization({})).toThrow(ArieValidationError);
+    });
+
+    it("clears company_domain on explicit null", () => {
+      const store = freshStore();
+      const updated = store.updateOrganization({ company_domain: null });
+      expect(updated.company_domain).toBeNull();
+    });
+  });
+
+  describe("members", () => {
+    it("lists only active members", () => {
+      const store = freshStore();
+      expect(store.listMembers().every((m) => m.status === "active")).toBe(true);
+    });
+
+    it("changes a non-owner's role", () => {
+      const store = freshStore();
+      const analyst = store.listMembers().find((m) => m.user_id === "mock-analyst")!;
+      const updated = store.updateMemberRole(analyst.user_id, { role: "admin" });
+      expect(updated.role).toBe("admin");
+    });
+
+    it("refuses to act on the caller's own membership", () => {
+      const store = freshStore();
+      const [self] = store.listMembers();
+      expect(() => store.updateMemberRole(self.user_id, { role: "owner" })).toThrow(
+        ArieConflictError,
+      );
+      expect(() => store.removeMember(self.user_id)).toThrow(ArieConflictError);
+    });
+
+    it("protects the organization's only remaining owner from demotion and removal", () => {
+      const store = freshStore();
+      const owner = store.listMembers().find((m) => m.role === "owner")!;
+      expect(() => store.updateMemberRole(owner.user_id, { role: "admin" })).toThrow(
+        ArieConflictError,
+      );
+      expect(() => store.removeMember(owner.user_id)).toThrow(ArieConflictError);
+    });
+
+    it("allows demoting an owner once a second owner exists", () => {
+      const store = freshStore();
+      const owner = store.listMembers().find((m) => m.role === "owner")!;
+      const analyst = store.listMembers().find((m) => m.user_id === "mock-analyst")!;
+      store.updateMemberRole(analyst.user_id, { role: "owner" });
+      expect(() => store.updateMemberRole(owner.user_id, { role: "admin" })).not.toThrow();
+    });
+
+    it("404s for an unknown member id", () => {
+      const store = freshStore();
+      expect(() => store.updateMemberRole("nope", { role: "admin" })).toThrow(ArieNotFoundError);
+      expect(() => store.removeMember("nope")).toThrow(ArieNotFoundError);
+    });
+
+    it("rejects an unknown role", () => {
+      const store = freshStore();
+      const other = store.listMembers()[1];
+      expect(() => store.updateMemberRole(other.user_id, { role: "superadmin" })).toThrow(
+        ArieValidationError,
+      );
+    });
+  });
+
+  describe("invitations", () => {
+    it("creates a pending invitation with a one-time raw token", () => {
+      const store = freshStore();
+      const created = store.createInvitation({ email: "New.Teammate@Example.com", role: "admin" });
+      expect(created.status).toBe("pending");
+      expect(created.email_normalized).toBe("new.teammate@example.com");
+      expect(created.raw_token).toMatch(/^mock_/);
+      // The raw token never reaches the list response — only ever returned
+      // once, from create, matching the real backend's guarantee.
+      const listed = store.listInvitations()[0];
+      expect((listed as unknown as Record<string, unknown>).raw_token).toBeUndefined();
+    });
+
+    it("rejects a duplicate pending invitation for the same email", () => {
+      const store = freshStore();
+      store.createInvitation({ email: "dup@example.com", role: "admin" });
+      expect(() => store.createInvitation({ email: "dup@example.com", role: "admin" })).toThrow(
+        ArieConflictError,
+      );
+    });
+
+    it("accepts a valid pending token and creates a membership", () => {
+      const store = freshStore();
+      const created = store.createInvitation({ email: "invitee@example.com", role: "admin" });
+      const accepted = store.acceptInvitation({ token: created.raw_token });
+      expect(accepted.status).toBe("accepted");
+      expect(store.listMembers().some((m) => m.role === "admin")).toBe(true);
+    });
+
+    it("404s for an invalid, already-accepted, or revoked token (collapsed, IDOR-safe)", () => {
+      const store = freshStore();
+      expect(() => store.acceptInvitation({ token: "not-a-real-token" })).toThrow(
+        ArieNotFoundError,
+      );
+
+      const created = store.createInvitation({ email: "once@example.com", role: "admin" });
+      store.acceptInvitation({ token: created.raw_token });
+      expect(() => store.acceptInvitation({ token: created.raw_token })).toThrow(
+        ArieNotFoundError,
+      );
+
+      const revocable = store.createInvitation({ email: "revoked@example.com", role: "admin" });
+      store.revokeInvitation(revocable.invitation_id);
+      expect(() => store.acceptInvitation({ token: revocable.raw_token })).toThrow(
+        ArieNotFoundError,
+      );
+    });
+
+    it("expires a pending invitation past its expiry and reports 410", () => {
+      const store = freshStore();
+      const created = store.createInvitation({ email: "later@example.com", role: "admin" });
+      vi.setSystemTime(T0 + 8 * 24 * 60 * 60 * 1000);
+      let caught: unknown;
+      try {
+        store.acceptInvitation({ token: created.raw_token });
+      } catch (err) {
+        caught = err;
+      }
+      expect((caught as { status?: number }).status).toBe(410);
+      expect(store.listInvitations().find((i) => i.invitation_id === created.invitation_id)?.status).toBe(
+        "expired",
+      );
+    });
+
+    it("revokes a pending invitation", () => {
+      const store = freshStore();
+      const created = store.createInvitation({ email: "gone@example.com", role: "admin" });
+      const revoked = store.revokeInvitation(created.invitation_id);
+      expect(revoked.status).toBe("revoked");
+    });
+
+    it("404s revoking an unknown or already-resolved invitation", () => {
+      const store = freshStore();
+      expect(() => store.revokeInvitation("nope")).toThrow(ArieNotFoundError);
+    });
+  });
+
+  describe("providers", () => {
+    it("lists exactly the three supported providers, all unconfigured initially", () => {
+      const store = freshStore();
+      const providers = store.listProviders();
+      expect(providers).toHaveLength(3);
+      expect(providers.every((p) => !p.configured && !p.enabled)).toBe(true);
+    });
+
+    it("configures a credential without ever exposing it back", () => {
+      const store = freshStore();
+      const updated = store.setProviderCredential("hunter_combined_enrichment", {
+        credential: "secret-key-value",
+      });
+      expect(updated.configured).toBe(true);
+      expect(updated.enabled).toBe(true);
+      expect(JSON.stringify(updated)).not.toContain("secret-key-value");
+    });
+
+    it("rejects an empty credential", () => {
+      const store = freshStore();
+      expect(() =>
+        store.setProviderCredential("hunter_combined_enrichment", { credential: "  " }),
+      ).toThrow(ArieValidationError);
+    });
+
+    it("404s configuring an unknown provider", () => {
+      const store = freshStore();
+      expect(() =>
+        store.setProviderCredential("unknown_provider", { credential: "x" }),
+      ).toThrow(ArieNotFoundError);
+    });
+
+    it("refuses to enable/disable/test/remove an unconfigured provider", () => {
+      const store = freshStore();
+      expect(() =>
+        store.setProviderEnabled("apollo_person_enrichment", { enabled: true }),
+      ).toThrow(ArieNotFoundError);
+      expect(() => store.testProviderConnection("apollo_person_enrichment")).toThrow(
+        ArieNotFoundError,
+      );
+      expect(() => store.removeProviderCredential("apollo_person_enrichment")).toThrow(
+        ArieNotFoundError,
+      );
+    });
+
+    it("removes a configured credential back to the unconfigured state", () => {
+      const store = freshStore();
+      store.setProviderCredential("abstract_company_enrichment", { credential: "x" });
+      store.removeProviderCredential("abstract_company_enrichment");
+      const status = store.getProvider("abstract_company_enrichment");
+      expect(status.configured).toBe(false);
+      expect(status.enabled).toBe(false);
+    });
+
+    it("records a connection test result", () => {
+      const store = freshStore();
+      store.setProviderCredential("apollo_person_enrichment", { credential: "x" });
+      const tested = store.testProviderConnection("apollo_person_enrichment");
+      expect(tested.last_test_status).toBe("success");
+      expect(tested.last_tested_at).not.toBeNull();
+    });
+  });
+
+  describe("onboarding", () => {
+    it("starts incomplete with no ICP, upload, or processed batch", () => {
+      const store = freshStore();
+      const status = store.getOnboardingStatus();
+      expect(status.icp_configured).toBe(true); // mock seeds a reference ICP profile
+      expect(status.first_upload_completed).toBe(false);
+      expect(status.completed).toBe(false);
+      expect(status.completed_at).toBeNull();
+    });
+
+    it("excludes provider_configured from completion, matching the backend", () => {
+      const store = freshStore();
+      store.uploadBatch("leads.csv", [{ email: "a@b.com" }]);
+      const status = store.getOnboardingStatus();
+      expect(status.provider_configured).toBe(false);
+      expect(status.first_upload_completed).toBe(true);
+      expect(status.first_batch_processed).toBe(true);
+      expect(status.completed).toBe(true);
+    });
+
+    it("stamps completed_at exactly once", () => {
+      const store = freshStore();
+      store.uploadBatch("leads.csv", [{ email: "a@b.com" }]);
+      const first = store.getOnboardingStatus();
+      vi.setSystemTime(T0 + 60_000);
+      const second = store.getOnboardingStatus();
+      expect(second.completed_at).toBe(first.completed_at);
+    });
+  });
+
+  describe("limits", () => {
+    it("computes remaining as limit minus used, floored at zero", () => {
+      const store = freshStore();
+      const limits = store.getUsageAgainstLimits();
+      expect(limits.leads_remaining).toBe(limits.leads_limit - limits.leads_used);
+      expect(limits.max_csv_rows_per_upload).toBeGreaterThan(0);
+    });
+  });
+});

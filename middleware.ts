@@ -16,6 +16,12 @@ import { NextResponse, type NextRequest } from "next/server";
  * that contract. They resolve and enforce auth independently, via the same
  * `resolveAuthContext()` this middleware's redirect logic mirrors.
  *
+ * `/invite/accept` is also let through signed-out, like `/login` — its whole
+ * point is to be reachable by someone who followed an invitation link before
+ * ever signing in. The page itself renders an inline sign-in affordance and
+ * only calls `POST /invitations/accept` once a session exists; the backend
+ * independently verifies the invited email matches the signed-in identity.
+ *
  * A no-op entirely outside `api` data mode: "mock" mode is a fabricated,
  * client-side-only demo with no real backend and nothing to protect —
  * gating it behind a real Supabase login would break the zero-config
@@ -53,8 +59,9 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const onLoginPage = request.nextUrl.pathname === "/login";
+  const onInviteAcceptPage = request.nextUrl.pathname === "/invite/accept";
 
-  if (!user && !onLoginPage) {
+  if (!user && !onLoginPage && !onInviteAcceptPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
