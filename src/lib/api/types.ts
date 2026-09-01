@@ -665,3 +665,104 @@ export interface CreateOrganizationResponse {
   organization_id: string;
   slug: string;
 }
+
+// ---------------------------------------------------------------- targeting --
+//
+// M7 Slice 2. The AI-assisted way to configure targeting: describe the business
+// in plain English and review what ARIE understood, instead of assigning six
+// point weights by hand. `ICPProfileConfig` above is unchanged and remains what
+// actually scores — a confirmed targeting draft becomes one of those.
+
+export type TargetingObjective =
+  | "best_prospects"
+  | "maximize_buy_likelihood"
+  | "high_value"
+  | "minimize_wasted_outreach"
+  | "custom";
+
+export type PreferenceLevel = "none" | "low" | "medium" | "high" | "critical";
+
+export type BandPreference = "preferred" | "acceptable" | "avoid";
+
+export type EmployeeBandKey =
+  | "employees_1_10"
+  | "employees_11_50"
+  | "employees_51_200"
+  | "employees_201_1000"
+  | "employees_1001_plus";
+
+/** ARIE's structured reading of the two questions. Mirrors
+ * `arie.intelligence.schemas.BusinessProfileDraft` field for field. Nothing
+ * here is a point value or a threshold — the backend derives those, and it
+ * re-derives them on confirm regardless of what this client sends. */
+export interface BusinessProfileDraft {
+  offering_summary: string;
+  plain_english_summary: string;
+  ideal_company_types: string[];
+  preferred_industries: string[];
+  acceptable_industries: string[];
+  employee_band_preferences: Partial<Record<EmployeeBandKey, BandPreference>>;
+  preferred_seniorities: string[];
+  acceptable_seniorities: string[];
+  preferred_functions: string[];
+  acceptable_functions: string[];
+  preferred_titles: string[];
+  preferred_geographies: string[];
+  preferred_company_characteristics: string[];
+  positive_indicators: string[];
+  negative_indicators: string[];
+  hard_disqualifiers: string[];
+  research_worthy_unknowns: string[];
+  relative_preferences: Partial<Record<ScoringDimensionKey, PreferenceLevel>>;
+}
+
+export type ScoringDimensionKey =
+  | "employee_count"
+  | "industry"
+  | "title_seniority"
+  | "title_function"
+  | "buying_intent"
+  | "recent_trigger_event";
+
+export interface ScoringDimensionSummary {
+  dimension: string;
+  label: string;
+  points: number;
+  rank: number;
+}
+
+export interface TargetingDraftRequest {
+  what_you_sell: string;
+  who_you_want: string;
+  objective: TargetingObjective;
+}
+
+export interface TargetingDraftResponse {
+  objective: TargetingObjective;
+  profile: BusinessProfileDraft;
+  /** The full technical document, for Advanced Details. A preview only —
+   * nothing was written, and confirming recomputes it server-side. */
+  scoring_config: ICPProfileConfig;
+  allocation: ScoringDimensionSummary[];
+  llm_provider: string | null;
+  llm_model: string | null;
+  /** Modelled cost, as a string. Never a billed figure. */
+  llm_cost_usd: string;
+}
+
+export interface TargetingConfirmRequest {
+  name: string;
+  objective: TargetingObjective;
+  profile: BusinessProfileDraft;
+  llm_provider?: string | null;
+  llm_model?: string | null;
+}
+
+export interface TargetingVocabularies {
+  industries: string[];
+  seniorities: string[];
+  functions: string[];
+  objectives: string[];
+  preference_levels: string[];
+  scoring_dimensions: string[];
+}

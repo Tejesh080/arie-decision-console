@@ -27,6 +27,11 @@ const NAV = [
   { href: "/", label: "Overview" },
   { href: "/leads/new", label: "New lead" },
   { href: "/batches", label: "Batches" },
+  // Targeting sits ahead of ICP, and is the entry a new customer should find
+  // first: it asks two questions in plain English and generates the profile
+  // that /icp otherwise expects them to construct by hand. Both remain — a
+  // full navigation rework belongs to the later UX slice, not here.
+  { href: "/targeting", label: "Targeting" },
   { href: "/icp", label: "ICP" },
   { href: "/providers", label: "Providers" },
   { href: "/usage", label: "Usage" },
