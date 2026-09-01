@@ -20,8 +20,9 @@ import { CircleCheck } from "lucide-react";
  * `options.captchaToken` on `signUp()`. Left as a documented seam
  * (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) rather than a live widget: no
  * Cloudflare site key exists yet to render or test against, and Part 12 is
- * explicit that this must not block M6 development. See
- * docs/m6-operations.md for the exact production setup steps.
+ * explicit that this must not block M6 development. The backend repo's
+ * `docs/deployment.md` ("The commercial layer") carries the production
+ * setup steps for all three third-party accounts.
  */
 export function SignupView() {
   const [email, setEmail] = useState("");

@@ -80,6 +80,23 @@ Multiple organization memberships aren't handled with a switcher — the oldest 
 
 ---
 
+## Signup and billing
+
+Self-service, added in Productization M6. Two separate steps on purpose:
+
+1. **`/signup`** creates the Supabase Auth user (email + password, same as `/login`). Its only job is producing a _verified identity_ — no organization exists yet, and provisioning one for an unconfirmed email address is exactly what this split avoids.
+2. **Organization creation** appears inline on the "no organization access" screen once signed in, and calls `POST /organizations`. The backend creates the organization, the owner membership, and the billing row in one transaction, so the caller is an owner the moment it returns. A full page navigation follows, because that is what makes the middleware and `resolveAuthContext` see the new membership on the very next request.
+
+**Billing** lives on Settings (`BillingPanel`): current plan, subscription status, period, entitlement ceilings, Checkout per purchasable plan, and the Stripe Customer Portal once a customer exists. Three rules it follows:
+
+- The **effective** plan is displayed, not the stored one. A lapsed `growth` subscription shows "No active plan" and the unsubscribed ceilings, because that is what the API will actually enforce.
+- The browser **never names a Stripe price**. It sends an ARIE plan name (`starter`/`growth`/`pro`) and the backend translates it, so a caller cannot subscribe itself to an arbitrary price.
+- The grandfathered `internal` plan hides every commercial action. It has no Stripe relationship and never will.
+
+With no Stripe credentials configured on the backend, none of this breaks — `/billing` still reports the plan and entitlements, and Checkout/Portal refuse with a readable message rather than a blank panel.
+
+---
+
 ## Human review demo
 
 The clearest way to see the whole product thesis — a machine recommendation that isn't automatically actionable, and a human decision that becomes the record of what actually happened without erasing what the machine said.
@@ -152,7 +169,13 @@ The provider ledger keeps three orthogonal facts separate, because collapsing an
 
 ### Backend endpoints integrated
 
-`POST /leads`, `GET /leads/{id}`, `GET /leads/{id}/receipt`, `GET /reviews/{id}`, `POST /reviews/{id}/decision`, `GET /healthz` — confirmed against the backend's own source (`src/arie/api/schemas.py`, `src/arie/core/types.py`, `src/arie/approval/workflow.py`), not guessed. The backend has no endpoint to list leads server-side, so the dashboard's "recently submitted" list is explicitly local browser history, not a claim about server state.
+Leads and review: `POST /leads`, `GET /leads/{id}`, `GET /leads/{id}/receipt`, `GET /reviews/{id}`, `POST /reviews/{id}/decision`, `GET /healthz`.
+
+Organization: `GET/PATCH /organization`, `/organization/members`, `/organization/invitations` (+ resend), `/invitations/accept`, `/organization/providers*`, `/organization/icp*`, `/organization/limits`, `/organization/onboarding`, `/batches*`, `/usage`.
+
+Commercial: `POST /organizations` (self-service provisioning), `GET /billing`, `POST /billing/checkout`, `POST /billing/portal`. `POST /billing/webhook` is deliberately **not** proxied — Stripe calls it directly on the backend, and a signature verified over a re-serialized body would not verify at all.
+
+All confirmed against the backend's own source (`src/arie/api/schemas.py`, `src/arie/core/types.py`, `src/arie/approval/workflow.py`, `src/arie/billing/`), not guessed. The backend has no endpoint to list leads server-side, so the dashboard's "recently submitted" list is explicitly local browser history, not a claim about server state.
 
 ---
 
@@ -202,4 +225,6 @@ Never add `DATABASE_URL`, `DATABASE_DIRECT_URL`, `SUPABASE_JWT_SECRET`, a Supaba
 
 ## Non-goals
 
-User/team management (invitations, roles, billing), an organization switcher, CRM/OAuth integrations, real enrichment providers, rate limiting. Human sign-in and organization-scoped access are in scope (see [Authentication](#authentication)); everything above it in a full multi-tenant product is not.
+An organization switcher, CRM/OAuth integrations, usage-based metered pricing, dunning/invoice history UI, and admin tooling for managing other tenants. Human sign-in, organization-scoped access, team management, and self-serve billing are all in scope now (see [Authentication](#authentication) and [Signup and billing](#signup-and-billing)).
+
+Two things are deliberately _not_ this app's job even though they look like they should be. Stripe's webhook goes straight to the backend, never through these proxy routes. And `/checkout-return` never claims a subscription is active — the browser coming back from Stripe is not proof of payment, so that page points at Settings, which reads the real state.
