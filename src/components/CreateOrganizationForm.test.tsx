@@ -110,3 +110,65 @@ describe("CreateOrganizationForm", () => {
     expect(createOrganizationMock).toHaveBeenCalledOnce();
   });
 });
+
+describe("CreateOrganizationForm with Turnstile configured", () => {
+  beforeEach(() => {
+    createOrganizationMock.mockReset();
+    assignMock.mockReset();
+    vi.stubGlobal("location", { origin: "https://console.example", assign: assignMock });
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "1x00000000000000000000AA");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("blocks submission until the challenge has produced a token", async () => {
+    // Cloudflare's script never loads in jsdom, so no token ever arrives —
+    // which is exactly the state this assertion cares about. Submitting
+    // without one would earn a 403 from the backend and read to the user as
+    // a broken form rather than an unfinished challenge.
+    render(<CreateOrganizationForm />);
+
+    await userEvent.type(screen.getByLabelText(/organization name/i), "Acme Inc.");
+
+    expect(screen.getByRole("button", { name: /create organization/i })).toBeDisabled();
+    expect(createOrganizationMock).not.toHaveBeenCalled();
+  });
+
+  it("renders the widget mount point when a site key is configured", () => {
+    render(<CreateOrganizationForm />);
+    expect(screen.getByTestId("turnstile-widget")).toBeInTheDocument();
+  });
+});
+
+describe("CreateOrganizationForm without Turnstile configured", () => {
+  beforeEach(() => {
+    createOrganizationMock.mockReset();
+    assignMock.mockReset();
+    vi.stubGlobal("location", { origin: "https://console.example", assign: assignMock });
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("renders no widget and sends no turnstile_token key at all", async () => {
+    // The unconfigured shape must stay byte-identical to the pre-Turnstile
+    // request: the backend's dev/CI seam accepts a missing token, and
+    // sending an explicit `turnstile_token: null` would be a different
+    // payload for no reason.
+    createOrganizationMock.mockResolvedValue({ organization_id: "org-1", slug: "acme-inc" });
+    render(<CreateOrganizationForm />);
+
+    expect(screen.queryByTestId("turnstile-widget")).not.toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/organization name/i), "Acme Inc.");
+    await userEvent.click(screen.getByRole("button", { name: /create organization/i }));
+
+    await waitFor(() => expect(createOrganizationMock).toHaveBeenCalledWith({ name: "Acme Inc." }));
+  });
+});
