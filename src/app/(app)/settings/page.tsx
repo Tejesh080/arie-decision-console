@@ -1,6 +1,7 @@
 import { getDataMode } from "@/lib/api/mode";
 import { resolveAuthContext } from "@/lib/auth/context";
 import { OrganizationDetailsPanel } from "@/components/settings/OrganizationDetailsPanel";
+import { BillingPanel } from "@/components/settings/BillingPanel";
 import { MembersPanel } from "@/components/settings/MembersPanel";
 import { InvitationsPanel } from "@/components/settings/InvitationsPanel";
 import { Eyebrow } from "@/components/ui/Panel";
@@ -31,6 +32,7 @@ export default async function SettingsPage() {
       </header>
 
       <OrganizationDetailsPanel canEdit={canEdit} />
+      <BillingPanel canEdit={canEdit} />
       <MembersPanel canEdit={canEdit} currentUserId={currentUserId} />
       <InvitationsPanel canEdit={canEdit} />
     </div>

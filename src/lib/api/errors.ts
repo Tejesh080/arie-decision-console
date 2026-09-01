@@ -58,6 +58,19 @@ export class ArieUnavailableError extends ArieApiError {
   }
 }
 
+/** 402 — Productization M6's plan-entitlement gate (a member-count ceiling,
+ * or a live-provider feature this organization's plan doesn't include).
+ * Distinct from every other error here: the request was well-formed and the
+ * caller was authorized, but the *organization's plan* doesn't currently
+ * allow it — the UI's response should point at Billing, not show a generic
+ * failure. */
+export class ArieEntitlementError extends ArieApiError {
+  constructor(message: string, detail?: unknown) {
+    super(message, 402, detail);
+    this.name = "ArieEntitlementError";
+  }
+}
+
 /** A client-side bounded wait (e.g. polling for a decision) ran out of time
  * without reaching the awaited state. Not an HTTP error — the backend may
  * still be working. */
@@ -70,6 +83,7 @@ export class ArieTimeoutError extends Error {
 
 /** Maps an HTTP status + parsed body to the right typed error. */
 export function errorForResponse(status: number, message: string, detail?: unknown): ArieApiError {
+  if (status === 402) return new ArieEntitlementError(message, detail);
   if (status === 404) return new ArieNotFoundError(message, detail);
   if (status === 409) return new ArieConflictError(message, detail);
   if (status === 422) return new ArieValidationError(message, detail);

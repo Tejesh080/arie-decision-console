@@ -4,8 +4,13 @@ import type {
   Batch,
   BatchRow,
   BatchRowsPage,
+  BillingPortalResponse,
+  BillingResponse,
+  CheckoutSessionResponse,
   CreateICPProfileRequest,
   CreateInvitationRequest,
+  CreateOrganizationRequest,
+  CreateOrganizationResponse,
   HealthResponse,
   ICPProfile,
   ICPProfileConfig,
@@ -1018,12 +1023,62 @@ class MockArieStore {
       ...this.organization,
       ...(request.name !== undefined ? { name: request.name } : {}),
       ...(request.timezone !== undefined ? { timezone: request.timezone } : {}),
-      ...(request.company_domain !== undefined
-        ? { company_domain: request.company_domain }
-        : {}),
+      ...(request.company_domain !== undefined ? { company_domain: request.company_domain } : {}),
       updated_at: new Date().toISOString(),
     };
     return this.organization;
+  }
+
+  // --------------------------------------------------------------- billing --
+  //
+  // Productization M6. Mock mode fabricates the same grandfathered,
+  // always-entitled `plan='internal'` state the Legacy Organization gets in
+  // production — see `getUsageAgainstLimits` above. There is no real Stripe
+  // account behind this demo, so Checkout/Portal are not meaningfully
+  // simulatable; `BillingPanel` never offers them for an `internal` plan
+  // (same as it would in production), so these two are unreachable in
+  // practice and exist only to satisfy the shared client interface.
+
+  getBilling(): BillingResponse {
+    const now = new Date().toISOString();
+    return {
+      billing: {
+        organization_id: this.mockOrgId,
+        stripe_customer_id: null,
+        stripe_subscription_id: null,
+        plan: "internal",
+        status: "active",
+        current_period_start: null,
+        current_period_end: null,
+        cancel_at_period_end: false,
+        canceled_at: null,
+        created_at: now,
+        updated_at: now,
+      },
+      entitlements: {
+        plan: "internal",
+        max_leads_per_month: 5000,
+        max_csv_rows_per_upload: 200,
+        max_modeled_spend_usd_per_month: 50,
+        max_members: 25,
+        live_provider_feature_allowed: true,
+      },
+    };
+  }
+
+  startCheckout(): CheckoutSessionResponse {
+    throw new ArieApiError("Billing checkout is not available in the demo.", 501);
+  }
+
+  openBillingPortal(): BillingPortalResponse {
+    throw new ArieApiError("The billing portal is not available in the demo.", 501);
+  }
+
+  // ---------------------------------------------------------- provisioning --
+
+  createOrganization(request: CreateOrganizationRequest): CreateOrganizationResponse {
+    if (!request.name.trim()) throw new ArieValidationError("organization name must not be empty");
+    return { organization_id: this.mockOrgId, slug: this.organization.slug };
   }
 
   // ------------------------------------------------------------- members --
@@ -1108,6 +1163,9 @@ class MockArieStore {
       expires_at: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       accepted_at: null,
       revoked_at: null,
+      email_status: "sent",
+      email_error: null,
+      email_sent_at: now.toISOString(),
     };
     this.invitations = [...this.invitations, base];
     this.invitationTokens.set(invitationId, rawToken);
@@ -1122,6 +1180,15 @@ class MockArieStore {
     invitation.status = "revoked";
     invitation.revoked_at = new Date().toISOString();
     return invitation;
+  }
+
+  resendInvitation(invitationId: string): InvitationCreatedResponse {
+    const invitation = this.invitations.find(
+      (i) => i.invitation_id === invitationId && i.status === "pending",
+    );
+    if (!invitation) throw new ArieNotFoundError("no pending invitation with that id");
+    this.revokeInvitation(invitationId);
+    return this.createInvitation({ email: invitation.email_normalized, role: invitation.role });
   }
 
   /** Mock mode has no verified-identity flow to check an email against — it
@@ -1286,6 +1353,13 @@ class MockArieStore {
       max_csv_rows_per_upload: this.limits.maxCsvRowsPerUpload,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
+      // Mock mode fabricates the same generous, always-entitled state the
+      // Legacy Organization gets in production (`plan='internal'`) — see
+      // `arie.billing.plans.PLAN_DEFINITIONS`. There is no real Stripe
+      // subscription to simulate here.
+      plan: "internal",
+      members_used: this.members.filter((m) => m.status === "active").length,
+      members_limit: 25,
     };
   }
 }

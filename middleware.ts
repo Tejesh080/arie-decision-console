@@ -16,11 +16,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * that contract. They resolve and enforce auth independently, via the same
  * `resolveAuthContext()` this middleware's redirect logic mirrors.
  *
- * `/invite/accept` is also let through signed-out, like `/login` — its whole
- * point is to be reachable by someone who followed an invitation link before
- * ever signing in. The page itself renders an inline sign-in affordance and
- * only calls `POST /invitations/accept` once a session exists; the backend
+ * `/invite/accept` and `/signup` are also let through signed-out, like
+ * `/login`. `/invite/accept`'s whole point is to be reachable by someone who
+ * followed an invitation link before ever signing in — the page itself
+ * renders an inline sign-in affordance and only calls
+ * `POST /invitations/accept` once a session exists; the backend
  * independently verifies the invited email matches the signed-in identity.
+ * `/signup` (Productization M6 Part 17) is the self-service account-creation
+ * page — by definition reached before any session exists.
  *
  * A no-op entirely outside `api` data mode: "mock" mode is a fabricated,
  * client-side-only demo with no real backend and nothing to protect —
@@ -59,15 +62,16 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const onLoginPage = request.nextUrl.pathname === "/login";
+  const onSignupPage = request.nextUrl.pathname === "/signup";
   const onInviteAcceptPage = request.nextUrl.pathname === "/invite/accept";
 
-  if (!user && !onLoginPage && !onInviteAcceptPage) {
+  if (!user && !onLoginPage && !onSignupPage && !onInviteAcceptPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && onLoginPage) {
+  if (user && (onLoginPage || onSignupPage)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
@@ -77,5 +81,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

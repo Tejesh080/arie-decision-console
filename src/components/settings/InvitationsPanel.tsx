@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { CircleAlert, Mail, X } from "lucide-react";
-import { createInvitation, listInvitations, revokeInvitation } from "@/lib/api/invitations";
+import {
+  createInvitation,
+  listInvitations,
+  resendInvitation,
+  revokeInvitation,
+} from "@/lib/api/invitations";
 import { ArieApiError } from "@/lib/api/errors";
 import { ROLES, type InvitationCreatedResponse, type InvitationResponse } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
@@ -35,6 +40,7 @@ export function InvitationsPanel({ canEdit }: { canEdit: boolean }) {
   const [justCreated, setJustCreated] = useState<InvitationCreatedResponse | null>(null);
 
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
   async function load() {
@@ -85,6 +91,20 @@ export function InvitationsPanel({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function handleResend(invitationId: string) {
+    setResendingId(invitationId);
+    setRowError(null);
+    try {
+      const reissued = await resendInvitation(invitationId);
+      setJustCreated(reissued);
+      await load();
+    } catch (err) {
+      setRowError(err instanceof ArieApiError ? err.message : String(err));
+    } finally {
+      setResendingId(null);
+    }
+  }
+
   const pending = invitations.filter((i) => i.status === "pending");
   const resolved = invitations.filter((i) => i.status !== "pending");
 
@@ -93,14 +113,18 @@ export function InvitationsPanel({ canEdit }: { canEdit: boolean }) {
       <PanelHeader
         eyebrow="Invitations"
         title="Invite members"
-        trailing={!canEdit && <Badge tone="neutral" size="sm">Read-only</Badge>}
+        trailing={
+          !canEdit && (
+            <Badge tone="neutral" size="sm">
+              Read-only
+            </Badge>
+          )
+        }
       />
 
-      {/* Automated email delivery is not wired up yet — the raw token is
-       * shown to the admin exactly once and must be shared out-of-band. */}
       <p className="mt-2 text-xs text-text-faint">
-        Automated email delivery isn&apos;t configured yet — after creating an invitation, copy the
-        link and send it to the recipient yourself.
+        An invitation email is sent automatically. The link below is also shown once as a backup —
+        useful if delivery fails or you&apos;d rather share it directly.
       </p>
 
       {canEdit && (
@@ -143,8 +167,8 @@ export function InvitationsPanel({ canEdit }: { canEdit: boolean }) {
       {justCreated && (
         <div className="mt-4 rounded-md border border-human-edge bg-human-dim px-3 py-3">
           <p className="text-xs font-medium text-human">
-            Invitation created for {justCreated.email_normalized}. Copy this link now — it will
-            not be shown again.
+            Invitation created for {justCreated.email_normalized}. Copy this link now — it will not
+            be shown again.
           </p>
           <div className="mt-2 flex items-center gap-2">
             <code className="t-data flex-1 truncate rounded bg-bg-sunken px-2 py-1.5 text-xs text-text">
@@ -184,12 +208,23 @@ export function InvitationsPanel({ canEdit }: { canEdit: boolean }) {
                       <p className="truncate text-sm text-text">{invitation.email_normalized}</p>
                       <p className="t-data mt-0.5 text-xs text-text-faint">
                         {invitation.role} · expires {formatDateTime(invitation.expires_at)}
+                        {invitation.email_status === "failed" && " · email delivery failed"}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge tone={STATUS_TONE[invitation.status]} size="sm">
                         {invitation.status}
                       </Badge>
+                      {canEdit && invitation.email_status === "failed" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={resendingId === invitation.invitation_id}
+                          onClick={() => handleResend(invitation.invitation_id)}
+                        >
+                          {resendingId === invitation.invitation_id ? "Resending…" : "Resend"}
+                        </Button>
+                      )}
                       {canEdit && (
                         <Button
                           variant="ghost"

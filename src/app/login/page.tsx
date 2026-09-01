@@ -91,6 +91,13 @@ export default function LoginPage() {
               {pending ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+
+          <p className="mt-5 text-center text-xs text-text-faint">
+            Don&apos;t have an account?{" "}
+            <a href="/signup" className="text-machine hover:underline">
+              Create one
+            </a>
+          </p>
         </Panel>
       </div>
     </main>

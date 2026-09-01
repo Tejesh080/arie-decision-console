@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CircleAlert } from "lucide-react";
 import { getUsage } from "@/lib/api/usage";
 import { getUsageAgainstLimits } from "@/lib/api/limits";
@@ -110,10 +111,20 @@ export default function UsagePage() {
 
           {limits && (
             <Panel padding="lg" accent={limits.leads_remaining === 0 ? "reject" : undefined}>
-              <Eyebrow>Monthly limits</Eyebrow>
-              <p className="mt-1 text-xs text-text-faint">
-                {formatDateTime(limits.period_start)} – {formatDateTime(limits.period_end)}
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Eyebrow>Monthly limits</Eyebrow>
+                  <p className="mt-1 text-xs text-text-faint">
+                    {formatDateTime(limits.period_start)} – {formatDateTime(limits.period_end)}
+                  </p>
+                </div>
+                <Link
+                  href="/settings"
+                  className="shrink-0 rounded-full border border-border-strong bg-surface-2 px-2.5 py-1 text-[0.6875rem] font-medium tracking-[0.06em] text-text-dim uppercase hover:text-text"
+                >
+                  {limits.plan} plan
+                </Link>
+              </div>
               <div className="mt-4">
                 <StatRow>
                   <Stat
@@ -129,9 +140,16 @@ export default function UsagePage() {
                     value={formatUsd(limits.modeled_spend_used_usd, 2)}
                     tone={limits.modeled_spend_remaining_usd <= 0 ? "reject" : "default"}
                   />
+                  <Stat label="Max CSV rows / upload" value={limits.max_csv_rows_per_upload} />
+                </StatRow>
+              </div>
+              <div className="mt-6 border-t border-border pt-5">
+                <StatRow>
                   <Stat
-                    label="Max CSV rows / upload"
-                    value={limits.max_csv_rows_per_upload}
+                    label="Team members"
+                    hint={`of ${limits.members_limit}`}
+                    value={limits.members_used}
+                    tone={limits.members_used >= limits.members_limit ? "human" : "default"}
                   />
                 </StatRow>
               </div>
@@ -142,8 +160,11 @@ export default function UsagePage() {
                     className="h-4 w-4 shrink-0 text-reject"
                     strokeWidth={2.25}
                   />
-                  This organization has reached its monthly quota. New leads and batch uploads
-                  will be rejected until the next period starts.
+                  This organization has reached its monthly quota. New leads and batch uploads will
+                  be rejected until the next period starts.{" "}
+                  <Link href="/settings" className="underline">
+                    Upgrade your plan
+                  </Link>
                 </p>
               )}
               <p className="mt-4 text-[0.6875rem] leading-relaxed text-text-faint">

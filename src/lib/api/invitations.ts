@@ -27,13 +27,27 @@ export async function revokeInvitation(invitationId: string): Promise<Invitation
   );
 }
 
+/** Productization M6 Part 14 — revokes the existing pending invitation and
+ * issues a fresh one for the same email/role (a raw token is never
+ * persisted, so a literal resend of the same link is impossible by
+ * design). Returns the new invitation, including its new `raw_token`. */
+export async function resendInvitation(invitationId: string): Promise<InvitationCreatedResponse> {
+  if (getDataMode() === "mock") return mockStore.resendInvitation(invitationId);
+  return apiClient.post<InvitationCreatedResponse>(
+    `/organization/invitations/${encodeURIComponent(invitationId)}/resend`,
+    {},
+  );
+}
+
 /**
  * The only call in this app made from an unauthenticated-by-org (but
  * signed-in) context — see `requireUserSession` on the proxy side. Not
  * data-mode-branched below the proxy boundary in "api" mode; mock mode still
  * goes through `mockStore` like every other domain here.
  */
-export async function acceptInvitation(input: AcceptInvitationRequest): Promise<InvitationResponse> {
+export async function acceptInvitation(
+  input: AcceptInvitationRequest,
+): Promise<InvitationResponse> {
   if (getDataMode() === "mock") return mockStore.acceptInvitation(input);
   return apiClient.post<InvitationResponse>("/invitations/accept", input);
 }

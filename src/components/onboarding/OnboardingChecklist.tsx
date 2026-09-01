@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Circle, CircleCheck, CircleAlert } from "lucide-react";
 import Link from "next/link";
 import { getOnboardingStatus } from "@/lib/api/onboarding";
-import type { OnboardingStatusResponse } from "@/lib/api/types";
+import { getBilling } from "@/lib/api/billing";
+import type { BillingResponse, OnboardingStatusResponse } from "@/lib/api/types";
 import { isSimulated } from "@/lib/api/providerMode";
 import { formatDateTime } from "@/lib/format";
 import { Eyebrow, Panel } from "@/components/ui/Panel";
@@ -59,6 +60,7 @@ export function OnboardingChecklist() {
   const [status, setStatus] = useState<OnboardingStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [billing, setBilling] = useState<BillingResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +74,13 @@ export function OnboardingChecklist() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    // Best-effort — a failed billing fetch just hides this one row rather
+    // than blocking the rest of the checklist (see `billing &&` below).
+    getBilling()
+      .then((result) => {
+        if (!cancelled) setBilling(result);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -83,8 +92,8 @@ export function OnboardingChecklist() {
         <Eyebrow>Getting started</Eyebrow>
         <h1 className="t-h1 mt-2 text-text">Onboarding</h1>
         <p className="mt-3 max-w-2xl text-[0.9375rem] leading-relaxed text-text-dim">
-          What ARIE derives from your organization&apos;s current state — not a workflow you have
-          to step through in order.
+          What ARIE derives from your organization&apos;s current state — not a workflow you have to
+          step through in order.
         </p>
       </header>
 
@@ -121,7 +130,10 @@ export function OnboardingChecklist() {
                         strokeWidth={2.25}
                       />
                     ) : (
-                      <Circle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-text-faint" strokeWidth={2} />
+                      <Circle
+                        className="mt-0.5 h-4.5 w-4.5 shrink-0 text-text-faint"
+                        strokeWidth={2}
+                      />
                     )}
                     <div>
                       <p className="text-sm text-text">
@@ -137,15 +149,48 @@ export function OnboardingChecklist() {
                       <p className="mt-0.5 text-xs text-text-faint">{step.description}</p>
                     </div>
                   </div>
-                  <Link
-                    href={step.href}
-                    className="shrink-0 text-xs text-machine hover:underline"
-                  >
+                  <Link href={step.href} className="shrink-0 text-xs text-machine hover:underline">
                     {done ? "View" : "Set up"}
                   </Link>
                 </li>
               );
             })}
+
+            {billing && (
+              <li className="flex items-center justify-between gap-4 py-3">
+                <div className="flex items-start gap-3">
+                  {billing.entitlements.plan !== "unsubscribed" ? (
+                    <CircleCheck
+                      className="mt-0.5 h-4.5 w-4.5 shrink-0 text-qualify"
+                      strokeWidth={2.25}
+                    />
+                  ) : (
+                    <Circle
+                      className="mt-0.5 h-4.5 w-4.5 shrink-0 text-text-faint"
+                      strokeWidth={2}
+                    />
+                  )}
+                  <div>
+                    <p className="text-sm text-text">
+                      Plan &amp; billing
+                      <span className="ml-2">
+                        <Badge tone="neutral" size="sm">
+                          Optional while simulated
+                        </Badge>
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-text-faint">
+                      {billing.entitlements.plan === "unsubscribed"
+                        ? "No active subscription — running on the free floor."
+                        : `On the ${billing.entitlements.plan} plan.`}
+                    </p>
+                  </div>
+                </div>
+                <Link href="/settings" className="shrink-0 text-xs text-machine hover:underline">
+                  {billing.entitlements.plan === "unsubscribed" ? "Choose a plan" : "View"}
+                </Link>
+              </li>
+            )}
           </ul>
         </Panel>
       ) : null}

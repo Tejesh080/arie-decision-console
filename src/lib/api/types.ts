@@ -473,6 +473,12 @@ export interface InvitationResponse {
   expires_at: string;
   accepted_at: string | null;
   revoked_at: string | null;
+  /** Productization M6 Part 14 — delivery status of the invitation email
+   * itself, independent of `status` above. `'failed'` does not mean the
+   * invitation is unusable: the accept URL still works. */
+  email_status: "pending" | "sent" | "failed";
+  email_error: string | null;
+  email_sent_at: string | null;
 }
 
 /** Only ever returned once, at creation — `raw_token` is never retrievable
@@ -566,4 +572,96 @@ export interface UsageAgainstLimitsResponse {
   max_csv_rows_per_upload: number;
   period_start: string;
   period_end: string;
+  /** Productization M6 Part 23. */
+  plan: string;
+  members_used: number;
+  members_limit: number;
+}
+
+// -------------------------------------------------------------- billing --
+//
+// Productization M6. Mirrors `arie.api.schemas.EffectiveEntitlementsResponse`
+// / `OrganizationBillingResponse` / `BillingResponse` /
+// `StartCheckoutRequest` / `CheckoutSessionResponse` / `BillingPortalRequest`
+// / `BillingPortalResponse` field for field.
+
+/** `arie.billing.service.PURCHASABLE_PLANS` — never `"internal"`, which is
+ * grandfathered and not sold through Checkout. */
+export const PURCHASABLE_PLANS = ["starter", "growth", "pro"] as const;
+export type PurchasablePlan = (typeof PURCHASABLE_PLANS)[number];
+
+/** `"unsubscribed"` is a synthetic value the backend never stores — the
+ * safe floor for a plan with no currently-active subscription. */
+export type EffectivePlan = PurchasablePlan | "internal" | "unsubscribed";
+
+export interface EffectiveEntitlementsResponse {
+  plan: EffectivePlan;
+  max_leads_per_month: number;
+  max_csv_rows_per_upload: number;
+  max_modeled_spend_usd_per_month: number;
+  max_members: number;
+  live_provider_feature_allowed: boolean;
+}
+
+export type BillingStatus =
+  | "none"
+  | "incomplete"
+  | "incomplete_expired"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
+  | "paused";
+
+export interface OrganizationBillingResponse {
+  organization_id: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  plan: "internal" | PurchasablePlan;
+  status: BillingStatus;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingResponse {
+  billing: OrganizationBillingResponse;
+  entitlements: EffectiveEntitlementsResponse;
+}
+
+export interface StartCheckoutRequest {
+  plan: PurchasablePlan;
+  success_url: string;
+  cancel_url: string;
+}
+
+export interface CheckoutSessionResponse {
+  checkout_url: string;
+}
+
+export interface BillingPortalRequest {
+  return_url?: string | null;
+}
+
+export interface BillingPortalResponse {
+  portal_url: string;
+}
+
+// ---------------------------------------------------------- provisioning --
+//
+// Productization M6 Part 10. Mirrors `arie.api.schemas.CreateOrganizationRequest`
+// / `CreateOrganizationResponse`.
+
+export interface CreateOrganizationRequest {
+  name: string;
+  turnstile_token?: string | null;
+}
+
+export interface CreateOrganizationResponse {
+  organization_id: string;
+  slug: string;
 }

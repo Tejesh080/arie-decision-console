@@ -41,6 +41,9 @@ function makeLimits(
     max_csv_rows_per_upload: 200,
     period_start: "2026-01-01T00:00:00Z",
     period_end: "2026-02-01T00:00:00Z",
+    plan: "growth",
+    members_used: 3,
+    members_limit: 10,
     ...overrides,
   };
 }
