@@ -1210,15 +1210,23 @@ export interface DiscoveryFunnel {
   possible: number;
   unlikely: number;
   insufficient_info: number;
+  website_verified: number;
+  company_rejected_after_verification: number;
   promoted_to_leads: number;
   research_candidates: number;
   research_calls: number;
+  buyer_lookup_eligible: number;
   buyer_lookups: number;
+  buyer_found: number;
+  buyer_email_found: number;
   final_opportunities: number;
+  final_contactable_opportunities: number;
   llm_calls: number;
   llm_cost_usd: string;
   provider_calls: number;
   provider_cost_usd: string;
+  website_calls: number;
+  website_cost_usd: string;
 }
 
 export interface DiscoveryRun {
@@ -1235,12 +1243,42 @@ export interface DiscoveryRun {
   completed_at: string | null;
 }
 
+export type EmailStatus = "verified" | "likely" | "unverified" | "none";
+
+/** A superset of `NextAction` — `verify_contact_method` is the one state
+ * Opportunity Activation needed that the core recommendation vocabulary has
+ * no room for: a real, named buyer with no usable email. Never claims
+ * `contact_now`/`email_first` without a verified-or-likely email — see
+ * `arie.discovery.opportunity._next_action`. */
+export type OpportunityNextAction = NextAction | "verify_contact_method";
+
 export interface BuyerSignal {
   seniority: string | null;
   function: string | null;
   name_known: boolean;
   source: string | null;
   confidence: number | null;
+  full_name: string | null;
+  title: string | null;
+  email: string | null;
+  email_status: EmailStatus | null;
+  profile_url: string | null;
+}
+
+export type VerificationStatus = "verified" | "rejected" | "unavailable" | "skipped";
+
+export interface VerifiedCompanyFacts {
+  business_relevance:
+    "clearly_relevant" | "plausible" | "clearly_irrelevant" | "insufficient_content";
+  business_description: string;
+  industry_category: string;
+  customer_type: "b2b" | "b2c" | "both" | "unclear";
+  multi_location_signal: boolean | null;
+  operational_complexity_signal: boolean | null;
+  employee_size_clue: string | null;
+  products_services: string[];
+  geography_clue: string | null;
+  reasoning: string;
 }
 
 export interface Opportunity {
@@ -1249,17 +1287,22 @@ export interface Opportunity {
   company_name: string;
   domain: string;
   priority: CustomerPriority;
-  next_action: NextAction;
+  next_action: OpportunityNextAction;
   score: number | null;
   confidence: number | null;
   short_reason: string;
   key_evidence: string[];
   missing_information: string[];
   buyer: BuyerSignal | null;
+  alternate_buyers: BuyerSignal[];
   research_performed: boolean;
   discovery_source: string;
   source_url: string;
   search_query: string;
+  verification_status: VerificationStatus | null;
+  verified_facts: VerifiedCompanyFacts | null;
+  website_verified_at: string | null;
+  is_contactable: boolean;
 }
 
 export interface DiscoveryRunWithOpportunities {
