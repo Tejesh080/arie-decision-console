@@ -766,3 +766,111 @@ export interface TargetingVocabularies {
   preference_levels: string[];
   scoring_dimensions: string[];
 }
+
+// ------------------------------------------------------------ csv mapping --
+//
+// M7 Slice 3. ARIE reads a file's column headings before it is uploaded and
+// says what it thinks each one holds. `label` is what a customer sees;
+// `canonical_field` is the identifier a correction posts back — never show it.
+
+export interface MappedColumn {
+  source_column: string;
+  canonical_field: string | null;
+  label: string | null;
+  confidence: "exact" | "high" | "ambiguous" | "unmapped";
+  reason: string;
+  requires_confirmation: boolean;
+  candidates: string[];
+}
+
+export interface CanonicalMappingField {
+  name: string;
+  label: string;
+  description: string;
+  required: boolean;
+}
+
+export interface MappingPreview {
+  columns: MappedColumn[];
+  /** Canonical field -> column heading. Posted back verbatim when the customer
+   * changes nothing; the server revalidates it either way. */
+  field_map: Record<string, string>;
+  ignored_columns: string[];
+  conflicts: string[];
+  warnings: string[];
+  requires_confirmation: boolean;
+  /** False when no column holds an email address. Every lead needs one, so the
+   * upload cannot proceed until the customer picks one. */
+  usable: boolean;
+  mapping_method: "deterministic" | "llm" | "user_corrected";
+  available_fields: CanonicalMappingField[];
+  llm_provider: string | null;
+  llm_model: string | null;
+  llm_cost_usd: string;
+  llm_unavailable_reason: string | null;
+}
+
+// --------------------------------------------------- historical outcomes --
+
+export interface OutcomeGroup {
+  dimension: string;
+  group_key: string;
+  group_label: string;
+  sample_size: number;
+  positive_count: number;
+  negative_count: number;
+  positive_rate: number;
+  baseline_rate: number;
+  rate_difference: number;
+  signal: "insufficient_data" | "weak" | "moderate" | "strong";
+  /** ARIE's own associational phrasing. Safe to render as-is — it never claims
+   * causation. See `arie.intelligence.outcomes`. */
+  sentence: string;
+}
+
+export interface OutcomeAnalysis {
+  total_rows: number;
+  labelled_rows: number;
+  positive_count: number;
+  negative_count: number;
+  baseline_rate: number;
+  groups: OutcomeGroup[];
+  unrecognised_labels: Record<string, number>;
+  warnings: string[];
+  revenue_total_usd: string | null;
+  /** A model's prose about the aggregates. Null means the statistics stand
+   * alone, which they do. */
+  interpretation: string | null;
+  caveats: string[];
+  /** Present only when the data supported a suggestion. Its absence is normal. */
+  proposal_id: string | null;
+}
+
+export interface ProposedChange {
+  kind: "employee_band" | "industry" | "dimension_importance";
+  dimension: string;
+  target: string;
+  target_label: string;
+  from_value: string;
+  to_value: string;
+  rationale: string;
+}
+
+export interface RevisionProposal {
+  proposal_id: string;
+  organization_id: string;
+  profile_id: string;
+  profile_version: number;
+  source: string;
+  status: "proposed" | "accepted" | "rejected";
+  summary: string;
+  changes: ProposedChange[];
+  observations: string[];
+  caveats: string[];
+  supporting_statistics: Record<string, unknown>;
+  evidence_strength: "insufficient_data" | "weak" | "moderate" | "strong";
+  sample_size: number;
+  created_at: string;
+  resolved_at: string | null;
+  resulting_profile_id: string | null;
+}

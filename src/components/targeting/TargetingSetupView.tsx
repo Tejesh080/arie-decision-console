@@ -16,6 +16,7 @@ import type {
 import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { HistoricalOutcomes } from "./HistoricalOutcomes";
 
 /**
  * The primary way a customer configures targeting: two questions in their own
@@ -512,6 +513,12 @@ export function TargetingSetupView({ canEdit }: { canEdit: boolean }) {
           </Panel>
         </>
       )}
+
+      {/* Optional, and last: a customer with no past results should never feel
+          they are missing a step. It sits outside the draft flow because it
+          proposes changes to whatever profile is already active, not to the
+          draft being reviewed above. */}
+      {!draft && <HistoricalOutcomes canEdit={canEdit} onProfileUpdated={setConfirmed} />}
     </div>
   );
 }

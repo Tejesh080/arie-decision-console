@@ -3,13 +3,19 @@ import { getDataMode } from "./mode";
 import { mockStore } from "./mock/store";
 import type { Batch, BatchRowsPage } from "./types";
 
-export async function uploadBatch(file: File): Promise<Batch> {
+export async function uploadBatch(file: File, fieldMap?: Record<string, string>): Promise<Batch> {
   if (getDataMode() === "mock") {
     const rows = await parseCsvForMock(file);
     return mockStore.uploadBatch(file.name, rows);
   }
   const form = new FormData();
   form.append("file", file);
+  // M7 Slice 3. Optional: omitting it leaves `arie.batches`' own alias matching
+  // in charge, which is exactly what every caller got before the mapping step
+  // existed. The server revalidates whatever is sent.
+  if (fieldMap && Object.keys(fieldMap).length > 0) {
+    form.append("mapping", JSON.stringify(fieldMap));
+  }
   // Uploading and synchronously ingesting every row can take a while on a
   // cold hosted backend — see `submitLead`'s identical reasoning for its own
   // 28s timeout, above the transport default and just under the server

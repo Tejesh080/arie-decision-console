@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleAlert, Upload } from "lucide-react";
 import { listBatches, uploadBatch } from "@/lib/api/batches";
+import { previewMapping } from "@/lib/api/mapping";
+import { ColumnMappingReview } from "@/components/batches/ColumnMappingReview";
 import { ArieApiError, ArieUnavailableError, ArieValidationError } from "@/lib/api/errors";
-import type { Batch } from "@/lib/api/types";
+import type { Batch, MappingPreview } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { costNounShort } from "@/lib/api/providerMode";
 import { formatUsdCompact } from "@/lib/format";
@@ -26,6 +28,14 @@ export default function BatchesPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // M7: what ARIE thinks the file's columns are, and the mapping as it stands
+  // after any correction. `fieldMap` is kept separately from `preview` because
+  // the customer edits it and the preview is what the server said — keeping
+  // both makes "you changed this" visible without re-deriving anything.
+  const [preview, setPreview] = useState<MappingPreview | null>(null);
+  const [fieldMap, setFieldMap] = useState<Record<string, string>>({});
+  const [checkingColumns, setCheckingColumns] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setListError(null);
@@ -43,11 +53,49 @@ export default function BatchesPage() {
     void load();
   }, [load]);
 
+  /** Move one column onto a field, taking it off whichever column held it.
+   *
+   * Two columns cannot share a field — the server refuses that, and letting
+   * the UI express it would only produce a confusing error after the upload
+   * had already been attempted. */
+  function remapColumn(sourceColumn: string, canonicalField: string | null) {
+    setPreview((current) =>
+      current
+        ? {
+            ...current,
+            columns: current.columns.map((column) =>
+              column.source_column === sourceColumn
+                ? {
+                    ...column,
+                    canonical_field: canonicalField,
+                    label:
+                      current.available_fields.find((f) => f.name === canonicalField)?.label ??
+                      null,
+                    requires_confirmation: false,
+                  }
+                : column,
+            ),
+          }
+        : current,
+    );
+    setFieldMap((current) => {
+      const next: Record<string, string> = {};
+      for (const [field, column] of Object.entries(current)) {
+        if (column !== sourceColumn) next[field] = column;
+      }
+      if (canonicalField) next[canonicalField] = sourceColumn;
+      return next;
+    });
+    setUploadError(null);
+  }
+
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
     setUploadError(null);
     setRowCountHint(null);
+    setPreview(null);
+    setFieldMap({});
     if (!file) return;
     // A quick, best-effort line count for the "N rows detected" preview —
     // never the authoritative validation, which only the backend performs
@@ -59,14 +107,36 @@ export default function BatchesPage() {
     } catch {
       setRowCountHint(null);
     }
+
+    // Ask ARIE what the columns are. A failure here is not fatal: the upload
+    // still works through `arie.batches`' own alias matching, exactly as it did
+    // before this step existed, so the customer is not blocked by a preview.
+    setCheckingColumns(true);
+    try {
+      const result = await previewMapping(file);
+      setPreview(result);
+      setFieldMap(result.field_map);
+    } catch {
+      setPreview(null);
+      setFieldMap({});
+    } finally {
+      setCheckingColumns(false);
+    }
   }
+
+  /** Every lead needs an email address, so an upload with no email column
+   * would be refused by the server after the customer waited for it. */
+  const usable = "email" in fieldMap;
 
   async function handleUpload() {
     if (!selectedFile) return;
     setUploading(true);
     setUploadError(null);
     try {
-      const batch = await uploadBatch(selectedFile);
+      // The confirmed mapping goes with the file. The server revalidates it
+      // and refuses anything it cannot store — this is a convenience, not the
+      // authority on what a column means.
+      const batch = await uploadBatch(selectedFile, preview ? fieldMap : undefined);
       router.push(`/batches/${batch.batch_id}`);
     } catch (err) {
       if (err instanceof ArieValidationError) {
@@ -97,12 +167,9 @@ export default function BatchesPage() {
       <Panel padding="lg" className="mb-8" accent="machine">
         <Eyebrow>Upload CSV</Eyebrow>
         <p className="mt-2 text-sm text-text-dim">
-          Required column: <span className="t-data text-text">email</span>. Optional:{" "}
-          <span className="t-data text-text">first_name</span>,{" "}
-          <span className="t-data text-text">last_name</span>,{" "}
-          <span className="t-data text-text">company</span>,{" "}
-          <span className="t-data text-text">domain</span>,{" "}
-          <span className="t-data text-text">title</span>.
+          Your columns can be named whatever they already are — ARIE reads the headings and tells
+          you what it understood before anything is imported. It needs an email address for every
+          lead; company, contact name, website and job title are all useful if you have them.
         </p>
 
         <div className="mt-5 flex flex-col gap-4">
@@ -122,6 +189,19 @@ export default function BatchesPage() {
             </p>
           )}
 
+          {checkingColumns && (
+            <p className="text-xs text-text-faint">ARIE is checking the columns…</p>
+          )}
+
+          {preview && (
+            <ColumnMappingReview
+              preview={preview}
+              fieldMap={fieldMap}
+              onChange={remapColumn}
+              disabled={uploading}
+            />
+          )}
+
           {uploadError && (
             <p className="flex items-center gap-2 rounded-md border border-reject-edge bg-reject-dim px-3 py-2 text-sm text-text">
               <CircleAlert
@@ -134,7 +214,13 @@ export default function BatchesPage() {
           )}
 
           <div>
-            <Button variant="primary" onClick={handleUpload} disabled={!selectedFile || uploading}>
+            <Button
+              variant="primary"
+              onClick={handleUpload}
+              disabled={
+                !selectedFile || uploading || checkingColumns || (preview !== null && !usable)
+              }
+            >
               <Upload className="h-4 w-4" strokeWidth={2.25} />
               {uploading ? "Uploading and validating…" : "Upload and process"}
             </Button>
