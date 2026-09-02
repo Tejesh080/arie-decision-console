@@ -1505,6 +1505,41 @@ class MockArieStore {
         is_complete: true,
       },
     };
+    // Every accepted row's `lead_id` is shown to the customer (the batch
+    // results table links to it, "View" included), so it must resolve like
+    // any other lead -- not just exist as a string on the row. Scenario is
+    // pinned to AUTONOMOUS_TEMPLATE rather than derived per-email (as
+    // `createLead` does) because the row above already asserts AUTO_ROUTED
+    // for every accepted row; a hashed-random scenario here could disagree
+    // with what the batch table already told the customer.
+    const now = Date.now();
+    const settledAtMs = now - STAGE_BOUNDS_MS.SETTLED - 1000;
+    const store = this.get();
+    for (const row of records) {
+      if (row.lead_id === null) continue;
+      const source = rows[row.row_number - 1];
+      store.leadsById[row.lead_id] = {
+        lead_id: row.lead_id,
+        source: "batch_upload",
+        email: source.email,
+        full_name: source.full_name ?? null,
+        company_domain: source.company_domain ?? null,
+        company_name: source.company_name ?? null,
+        external_ref: null,
+        budget_usd_cap: "1.50",
+        company_id: crypto.randomUUID(),
+        person_id: crypto.randomUUID(),
+        version: 1,
+        created_at: new Date(settledAtMs).toISOString(),
+        createdAtMs: settledAtMs,
+        status: "AUTO_ROUTED",
+        scenario: AUTONOMOUS_TEMPLATE,
+        review: null,
+        isShadow: false,
+      };
+    }
+    this.persist();
+
     this.batchRows.set(batchId, records);
     this.batches = [batch, ...this.batches];
     return batch;
