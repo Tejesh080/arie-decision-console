@@ -2,8 +2,10 @@ import { ArieApiError, ArieConflictError, ArieNotFoundError, ArieValidationError
 import type {
   AcceptInvitationRequest,
   Batch,
+  BatchInsights,
   BatchRow,
   BatchRowsPage,
+  BatchSummary,
   BillingPortalResponse,
   BillingResponse,
   CheckoutSessionResponse,
@@ -16,7 +18,9 @@ import type {
   CreateOrganizationRequest,
   CreateOrganizationResponse,
   CustomerPriority,
+  DashboardSummary,
   ExecuteResearchRequest,
+  FeedbackInsights,
   FeedbackResponse,
   HealthResponse,
   ICPProfile,
@@ -1236,6 +1240,81 @@ class MockArieStore {
     };
   }
 
+  // -------------------------------------------------- M7 Slice 7: mock only --
+
+  getFeedbackInsights(): FeedbackInsights {
+    const rows = Array.from(this.feedback.values());
+    const total = rows.length;
+    const positive = rows.filter((r) => r.sentiment === "positive").length;
+    const byPriority: Record<string, Record<string, number>> = {};
+    const negativeReasons: Record<string, number> = {};
+    for (const row of rows) {
+      const bucket = (byPriority[row.recommendation_priority] ??= { positive: 0, negative: 0 });
+      bucket[row.sentiment] = (bucket[row.sentiment] ?? 0) + 1;
+      if (row.sentiment === "negative" && row.reason) {
+        negativeReasons[row.reason] = (negativeReasons[row.reason] ?? 0) + 1;
+      }
+    }
+    return {
+      total,
+      positive,
+      negative: total - positive,
+      agreement_rate: total > 0 ? positive / total : null,
+      support: total < 5 ? "insufficient_data" : total < 10 ? "summary_only" : "eligible",
+      by_priority: byPriority,
+      by_profile_version: {},
+      negative_reason_counts: negativeReasons,
+      groups: [],
+      // Mock mode has no profile_revision_proposals system to reuse.
+      proposal: null,
+    };
+  }
+
+  getDashboard(): DashboardSummary {
+    const leads = Object.values(this.get().leadsById).map((lead) => ({
+      lead,
+      recommendation: this.getRecommendation(lead.lead_id),
+    }));
+    const priorityCounts: Record<CustomerPriority, number> = {
+      contact_first: 0,
+      worth_pursuing: 0,
+      review: 0,
+      skip: 0,
+    };
+    for (const { recommendation } of leads) priorityCounts[recommendation.priority] += 1;
+
+    const rank: Record<CustomerPriority, number> = {
+      contact_first: 0,
+      worth_pursuing: 1,
+      review: 2,
+      skip: 3,
+    };
+    const topLeads: CopilotLeadReference[] = leads
+      .filter((entry) => entry.recommendation.priority !== "skip")
+      .sort((a, b) => rank[a.recommendation.priority] - rank[b.recommendation.priority])
+      .slice(0, 5)
+      .map(({ lead, recommendation }) => ({
+        lead_id: lead.lead_id,
+        company: lead.company_name,
+        contact: lead.full_name,
+        priority: recommendation.priority,
+        score: recommendation.score,
+        why: recommendation.short_reason,
+        next_action: recommendation.next_action,
+      }));
+
+    const latestBatch = this.batches.length > 0 ? this.batches[this.batches.length - 1] : null;
+
+    return {
+      priority_counts: priorityCounts,
+      top_leads: topLeads,
+      latest_batch: latestBatch,
+      // Mock mode has no profile_revision_proposals system to reuse.
+      open_proposals: [],
+      feedback: this.getFeedbackInsights(),
+    };
+  }
+
   getReview(reviewId: string): ReviewResponse {
     const store = this.get();
     const leadId = store.reviewIdToLeadId[reviewId];
@@ -1447,6 +1526,92 @@ class MockArieStore {
     }
     const rows = this.batchRows.get(batchId) ?? [];
     return { items: rows, limit: Math.max(rows.length, 1), offset: 0, total: rows.length };
+  }
+
+  // -------------------------------------------------- M7 Slice 7: mock only --
+
+  getBatchInsights(batchId: string): BatchInsights {
+    const rows = this.listBatchRows(batchId).items;
+    const priorityCounts: Record<CustomerPriority, number> = {
+      contact_first: 0,
+      worth_pursuing: 0,
+      review: 0,
+      skip: 0,
+    };
+    for (const row of rows) if (row.priority) priorityCounts[row.priority] += 1;
+    const decided = rows.filter((r) => r.lead_id !== null).length;
+
+    return {
+      total_leads: rows.length,
+      priority_counts: priorityCounts,
+      decided_leads: decided,
+      unknown_scoring_observations: 0,
+      expected_scoring_observations: decided * 6,
+      unknown_data_rate: decided > 0 ? 0 : null,
+      human_review_count: 0,
+      human_review_rate: decided > 0 ? 0 : null,
+      provider_calls: 0,
+      leads_with_provider_activity: 0,
+      modeled_provider_cost_usd: "0.0000",
+      actual_provider_cost_usd: "0.0000",
+      actual_provider_cost_known_calls: 0,
+      llm_calls: 0,
+      modeled_llm_cost_usd: "0.0000",
+      feedback_total: 0,
+      feedback_positive: 0,
+      feedback_approval_rate: null,
+    };
+  }
+
+  getBatchSummary(batchId: string): BatchSummary {
+    const insights = this.getBatchInsights(batchId);
+    const counts = insights.priority_counts;
+    return {
+      summary:
+        `${insights.total_leads} leads: ${counts.contact_first} Contact First, ` +
+        `${counts.worth_pursuing} Worth Pursuing, ${counts.review} Review, ${counts.skip} Skip.`,
+      // Mock mode never calls a model — see this file's own docstring.
+      source: "deterministic",
+    };
+  }
+
+  exportBatchCsv(batchId: string): string {
+    const rows = this.listBatchRows(batchId).items;
+    const header = [
+      "company",
+      "contact",
+      "email",
+      "priority",
+      "score",
+      "confidence",
+      "reason",
+      "next_action",
+      "research_status",
+      "status",
+      "profile_version",
+    ];
+    const lines = [header.join(",")];
+    for (const row of rows) {
+      const email = String(row.raw_row.email ?? row.raw_row.Email ?? "");
+      lines.push(
+        [
+          "",
+          "",
+          email,
+          row.priority ?? "",
+          "",
+          "",
+          row.short_reason ?? "",
+          row.next_action ?? "",
+          "",
+          row.lead_status ?? "",
+          "",
+        ]
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(","),
+      );
+    }
+    return lines.join("\r\n");
   }
 
   // -------------------------------------------------------------- usage --

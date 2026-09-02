@@ -4,9 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CircleAlert } from "lucide-react";
-import { getBatch, listBatchRows } from "@/lib/api/batches";
+import { getBatch, getBatchInsights, listBatchRows } from "@/lib/api/batches";
 import { ArieNotFoundError } from "@/lib/api/errors";
-import type { Batch, BatchRow, BatchRowsPage, CustomerPriority } from "@/lib/api/types";
+import type {
+  Batch,
+  BatchInsights,
+  BatchRow,
+  BatchRowsPage,
+  CustomerPriority,
+} from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { costNoun, costCaveat } from "@/lib/api/providerMode";
 import { formatUsd } from "@/lib/format";
@@ -15,6 +21,7 @@ import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { StatRow, Stat } from "@/components/ui/Stat";
+import { BatchInsightsPanel } from "@/components/batches/BatchInsightsPanel";
 
 const POLL_MS = 3000;
 const ROWS_PER_PAGE = 50;
@@ -37,6 +44,7 @@ export default function BatchDetailPage() {
 
   const [batch, setBatch] = useState<Batch | null>(null);
   const [rows, setRows] = useState<BatchRowsPage | null>(null);
+  const [insights, setInsights] = useState<BatchInsights | null>(null);
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -52,6 +60,13 @@ export default function BatchDetailPage() {
       setBatch(b);
       setRows(r);
       setError(null);
+      // Best-effort, separate from the main fetch: insights failing to load
+      // never blocks the rows/progress this page already shows.
+      try {
+        setInsights(await getBatchInsights(batchId));
+      } catch {
+        setInsights(null);
+      }
     } catch (err) {
       if (err instanceof ArieNotFoundError) {
         setNotFound(true);
@@ -180,6 +195,8 @@ export default function BatchDetailPage() {
         </div>
         <p className="mt-4 text-[0.6875rem] leading-relaxed text-text-faint">{costCaveat()}</p>
       </Panel>
+
+      {insights && <BatchInsightsPanel batchId={batchId} insights={insights} />}
 
       <section>
         <h2 className="t-h3 mb-3 text-text">Rows</h2>

@@ -17,6 +17,7 @@ import { Mark } from "@/components/brand/Mark";
 import { DecisionField } from "@/components/graphics/DecisionField";
 import { LeadCard } from "@/components/dashboard/LeadCard";
 import { DemoCards, DemoSteps } from "@/components/dashboard/DemoCards";
+import { CustomerDashboard } from "@/components/dashboard/CustomerDashboard";
 import { riseIn, riseInStill, stagger } from "@/lib/motion";
 
 export default function DashboardPage() {
@@ -83,6 +84,11 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
+      {/* M7 Slice 7, Part H — a real customer's own operational dashboard.
+          Renders only in "api" mode; the marketing/demo content below is
+          unchanged and still what a signed-out or mock-mode visitor sees. */}
+      {mode === "api" && <CustomerDashboard />}
+
       {/* ------------------------------------------------------------ hero */}
       <motion.section
         variants={stagger(0.07)}

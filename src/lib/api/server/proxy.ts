@@ -146,3 +146,60 @@ function safeJsonParse(text: string): unknown {
     return { raw: text };
   }
 }
+
+/**
+ * Forwards a non-JSON backend response byte-for-byte — `GET /batches/{id}
+ * /export.csv` (M7 Slice 7, Part I3) is the one route that needs this: a CSV
+ * body, `text/csv` content-type, and the backend's own sanitized
+ * `Content-Disposition` filename, none of which `proxyToArie`'s JSON
+ * reshaping can carry through unchanged. A non-2xx response still comes back
+ * as this app's own shaped JSON error, matching every other route.
+ */
+export async function proxyDownloadToArie(
+  backendPath: string,
+  auth: ArieAuthHeaders,
+): Promise<NextResponse> {
+  const url = `${backendBaseUrl()}${backendPath}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+        ...(auth.organizationId ? { "X-Organization-Id": auth.organizationId } : {}),
+      },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      const text = await response.text();
+      return NextResponse.json(text ? safeJsonParse(text) : null, { status: response.status });
+    }
+
+    const body = await response.text();
+    return new NextResponse(body, {
+      status: 200,
+      headers: {
+        "Content-Type": response.headers.get("content-type") ?? "text/csv; charset=utf-8",
+        "Content-Disposition": response.headers.get("content-disposition") ?? "attachment",
+      },
+    });
+  } catch (cause) {
+    clearTimeout(timeout);
+    const aborted = controller.signal.aborted;
+    return NextResponse.json(
+      {
+        error: "backend_unreachable",
+        message: aborted
+          ? `ARIE backend at ${backendBaseUrl()} did not respond in time.`
+          : `Could not reach the ARIE backend at ${backendBaseUrl()}. Is it running?`,
+        cause: cause instanceof Error ? cause.message : String(cause),
+      },
+      { status: 502 },
+    );
+  }
+}

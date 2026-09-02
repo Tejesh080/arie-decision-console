@@ -612,6 +612,40 @@ export interface BatchRowsPage {
   total: number;
 }
 
+// -------------------------------------------------------- batch insights --
+//
+// M7 Slice 7, Part D/E/I. `arie.batch_insights`/`arie.batch_export`. Every
+// figure is deterministic except `BatchSummary`, which is its own route so a
+// batch page load never pays for an LLM call.
+
+export interface BatchInsights {
+  total_leads: number;
+  priority_counts: Record<CustomerPriority, number>;
+  decided_leads: number;
+  unknown_scoring_observations: number;
+  expected_scoring_observations: number;
+  unknown_data_rate: number | null;
+  human_review_count: number;
+  human_review_rate: number | null;
+  provider_calls: number;
+  leads_with_provider_activity: number;
+  modeled_provider_cost_usd: string;
+  actual_provider_cost_usd: string;
+  /** `0` means "no vendor reported a billed figure yet" — render as
+   * "unavailable", never as a confirmed `$0`. */
+  actual_provider_cost_known_calls: number;
+  llm_calls: number;
+  modeled_llm_cost_usd: string;
+  feedback_total: number;
+  feedback_positive: number;
+  feedback_approval_rate: number | null;
+}
+
+export interface BatchSummary {
+  summary: string;
+  source: "ai" | "deterministic";
+}
+
 // ---------------------------------------------------------------- usage --
 
 export interface UsageSummary {
@@ -1095,4 +1129,47 @@ export interface RevisionProposal {
   created_at: string;
   resolved_at: string | null;
   resulting_profile_id: string | null;
+}
+
+// ------------------------------------------------------ feedback learning --
+//
+// M7 Slice 7, Part A-C. `arie.intelligence.feedback_learning`/
+// `arie.feedback_learning_service`. `GET /intelligence/feedback-insights`
+// and `POST /intelligence/feedback/analyze` share this response shape — the
+// analyze route is the only one that may have created (or reused) `proposal`.
+
+export type FeedbackSupport = "insufficient_data" | "summary_only" | "eligible";
+
+export interface FeedbackInsights {
+  total: number;
+  positive: number;
+  negative: number;
+  agreement_rate: number | null;
+  support: FeedbackSupport;
+  by_priority: Record<string, Record<string, number>>;
+  by_profile_version: Record<string, Record<string, number>>;
+  negative_reason_counts: Record<string, number>;
+  groups: OutcomeGroup[];
+  proposal: RevisionProposal | null;
+}
+
+// -------------------------------------------------------------- dashboard --
+//
+// M7 Slice 7, Parts H/Q. `arie.dashboard`. Read-only, no LLM call.
+
+export interface DashboardFeedback {
+  total: number;
+  positive: number;
+  negative: number;
+  agreement_rate: number | null;
+  by_priority: Record<string, Record<string, number>>;
+  negative_reason_counts: Record<string, number>;
+}
+
+export interface DashboardSummary {
+  priority_counts: Record<CustomerPriority, number>;
+  top_leads: CopilotLeadReference[];
+  latest_batch: Batch | null;
+  open_proposals: RevisionProposal[];
+  feedback: DashboardFeedback;
 }

@@ -1,7 +1,7 @@
 import { apiClient } from "./client";
 import { getDataMode } from "./mode";
 import { mockStore } from "./mock/store";
-import type { Batch, BatchRowsPage } from "./types";
+import type { Batch, BatchInsights, BatchRowsPage, BatchSummary } from "./types";
 
 export async function uploadBatch(file: File, fieldMap?: Record<string, string>): Promise<Batch> {
   if (getDataMode() === "mock") {
@@ -42,6 +42,37 @@ export async function listBatchRows(
   return apiClient.get<BatchRowsPage>(
     `/batches/${encodeURIComponent(batchId)}/leads?limit=${limit}&offset=${offset}`,
   );
+}
+
+/** M7 Slice 7, Part D. Deterministic — never triggers an LLM call. */
+export async function getBatchInsights(batchId: string): Promise<BatchInsights> {
+  if (getDataMode() === "mock") return mockStore.getBatchInsights(batchId);
+  return apiClient.get<BatchInsights>(`/batches/${encodeURIComponent(batchId)}/insights`);
+}
+
+/** M7 Slice 7, Part E. The one optional AI call for a batch — a deliberate
+ * action, never fetched automatically alongside `getBatchInsights`. */
+export async function getBatchSummary(batchId: string): Promise<BatchSummary> {
+  if (getDataMode() === "mock") return mockStore.getBatchSummary(batchId);
+  return apiClient.post<BatchSummary>(
+    `/batches/${encodeURIComponent(batchId)}/summary`,
+    {},
+    { timeoutMs: 20_000 },
+  );
+}
+
+/** M7 Slice 7, Part I. Returns the CSV body as text rather than a JSON call
+ * — the caller turns this into a `Blob` and triggers a save-as, uniformly
+ * for mock and api mode (a plain `fetch` to the same-origin proxy route
+ * already carries the session cookie `proxyDownloadToArie` reads
+ * server-side, so no separate auth handling is needed here). */
+export async function exportBatchCsvText(batchId: string): Promise<string> {
+  if (getDataMode() === "mock") return mockStore.exportBatchCsv(batchId);
+  const response = await fetch(`/api/arie/batches/${encodeURIComponent(batchId)}/export`);
+  if (!response.ok) {
+    throw new Error(`Couldn't export this batch (${response.status}).`);
+  }
+  return response.text();
 }
 
 /** Mock mode has no server to parse a CSV, so this does the minimal

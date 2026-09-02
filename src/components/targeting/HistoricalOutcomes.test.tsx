@@ -188,7 +188,7 @@ describe("HistoricalOutcomes", () => {
     render(<HistoricalOutcomes canEdit />);
     await upload(user);
 
-    expect(await screen.findByText("Possible improvement")).toBeInTheDocument();
+    expect(await screen.findByText("From your past results")).toBeInTheDocument();
     expect(screen.getByText("Suggestion")).toBeInTheDocument();
     expect(screen.getByText(/Moderate evidence · 26 examples/)).toBeInTheDocument();
     expect(screen.getByText(/acceptable → preferred/)).toBeInTheDocument();
@@ -206,7 +206,7 @@ describe("HistoricalOutcomes", () => {
     const user = userEvent.setup();
     render(<HistoricalOutcomes canEdit onProfileUpdated={onProfileUpdated} />);
     await upload(user);
-    await screen.findByText("Possible improvement");
+    await screen.findByText("From your past results");
 
     expect(acceptMock).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: /apply this change/i }));
@@ -223,7 +223,7 @@ describe("HistoricalOutcomes", () => {
     const user = userEvent.setup();
     render(<HistoricalOutcomes canEdit />);
     await upload(user);
-    await screen.findByText("Possible improvement");
+    await screen.findByText("From your past results");
 
     await user.click(screen.getByRole("button", { name: /not now/i }));
     await waitFor(() => expect(rejectMock).toHaveBeenCalledWith("prop-1"));

@@ -2,12 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { CircleAlert, History } from "lucide-react";
-import { acceptProposal, analyzeOutcomes, getProposal, rejectProposal } from "@/lib/api/mapping";
+import { analyzeOutcomes, getProposal } from "@/lib/api/mapping";
 import { ArieApiError } from "@/lib/api/errors";
 import type { ICPProfile, OutcomeAnalysis, RevisionProposal } from "@/lib/api/types";
 import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { ProposalCard } from "./ProposalCard";
 
 /**
  * Optional: upload what happened with past companies, and see whether anything
@@ -46,14 +46,11 @@ export function HistoricalOutcomes({
   const [analysis, setAnalysis] = useState<OutcomeAnalysis | null>(null);
   const [proposal, setProposal] = useState<RevisionProposal | null>(null);
   const [analysing, setAnalysing] = useState(false);
-  const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [applied, setApplied] = useState<ICPProfile | null>(null);
 
   const analyse = useCallback(async (file: File) => {
     setAnalysing(true);
     setError(null);
-    setApplied(null);
     setProposal(null);
     try {
       const result = await analyzeOutcomes(file);
@@ -68,35 +65,6 @@ export function HistoricalOutcomes({
       setAnalysing(false);
     }
   }, []);
-
-  const accept = useCallback(async () => {
-    if (!proposal) return;
-    setResolving(true);
-    setError(null);
-    try {
-      const profile = await acceptProposal(proposal.proposal_id, "Updated from past results");
-      setApplied(profile);
-      setProposal({ ...proposal, status: "accepted" });
-      onProfileUpdated?.(profile);
-    } catch (err) {
-      setError(err instanceof ArieApiError ? err.message : String(err));
-    } finally {
-      setResolving(false);
-    }
-  }, [proposal, onProfileUpdated]);
-
-  const dismiss = useCallback(async () => {
-    if (!proposal) return;
-    setResolving(true);
-    setError(null);
-    try {
-      setProposal(await rejectProposal(proposal.proposal_id));
-    } catch (err) {
-      setError(err instanceof ArieApiError ? err.message : String(err));
-    } finally {
-      setResolving(false);
-    }
-  }, [proposal]);
 
   return (
     <Panel className="mt-8">
@@ -201,61 +169,12 @@ export function HistoricalOutcomes({
 
       {proposal && (
         <div className="mt-6 border-t border-edge pt-5">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h3 className="text-[0.8125rem] font-medium uppercase tracking-wide text-text-dim">
-              Possible improvement
-            </h3>
-            <Badge>{proposal.status === "proposed" ? "Suggestion" : proposal.status}</Badge>
-            <span className="text-xs text-text-faint">
-              {SIGNAL_LABEL[proposal.evidence_strength]} evidence · {proposal.sample_size} examples
-            </span>
-          </div>
-
-          <p className="text-[0.9375rem] leading-relaxed text-text">{proposal.summary}</p>
-
-          <ul className="mt-4 flex flex-col gap-2">
-            {proposal.changes.map((change) => (
-              <li key={`${change.kind}-${change.target}`} className="text-sm text-text">
-                <span className="font-medium">
-                  {change.target_label.charAt(0).toUpperCase() + change.target_label.slice(1)}
-                </span>{" "}
-                <span className="text-text-dim">
-                  — {change.from_value.replace(/_/g, " ")} → {change.to_value.replace(/_/g, " ")}
-                </span>
-                <p className="mt-0.5 text-xs text-text-faint">{change.rationale}</p>
-              </li>
-            ))}
-          </ul>
-
-          {proposal.caveats.map((caveat) => (
-            <p key={caveat} className="mt-3 text-xs text-text-faint">
-              {caveat}
-            </p>
-          ))}
-
-          {proposal.status === "proposed" ? (
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Button onClick={() => void accept()} disabled={resolving || !canEdit}>
-                {resolving ? "Applying…" : "Apply this change"}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => void dismiss()}
-                disabled={resolving || !canEdit}
-              >
-                Not now
-              </Button>
-              <span className="text-xs text-text-faint">
-                Applying creates a new targeting version. Nothing has changed yet.
-              </span>
-            </div>
-          ) : (
-            <p className="mt-5 text-sm text-text-dim">
-              {proposal.status === "accepted"
-                ? `Applied${applied ? ` as version ${applied.version}` : ""}.`
-                : "Dismissed. Your targeting is unchanged."}
-            </p>
-          )}
+          <ProposalCard
+            proposal={proposal}
+            canEdit={canEdit}
+            onResolved={setProposal}
+            onProfileUpdated={onProfileUpdated}
+          />
         </div>
       )}
     </Panel>

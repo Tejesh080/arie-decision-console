@@ -17,6 +17,7 @@ import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { HistoricalOutcomes } from "./HistoricalOutcomes";
+import { FeedbackInsightsPanel } from "./FeedbackInsightsPanel";
 
 /**
  * The primary way a customer configures targeting: two questions in their own
@@ -518,7 +519,12 @@ export function TargetingSetupView({ canEdit }: { canEdit: boolean }) {
           they are missing a step. It sits outside the draft flow because it
           proposes changes to whatever profile is already active, not to the
           draft being reviewed above. */}
-      {!draft && <HistoricalOutcomes canEdit={canEdit} onProfileUpdated={setConfirmed} />}
+      {!draft && (
+        <>
+          <FeedbackInsightsPanel canEdit={canEdit} onProfileUpdated={setConfirmed} />
+          <HistoricalOutcomes canEdit={canEdit} onProfileUpdated={setConfirmed} />
+        </>
+      )}
     </div>
   );
 }
