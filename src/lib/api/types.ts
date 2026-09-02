@@ -1267,6 +1267,13 @@ export interface BuyerSignal {
 
 export type VerificationStatus = "verified" | "rejected" | "unavailable" | "skipped";
 
+/** How much *real public evidence* (the company's own website) supports
+ * treating it as a prospect — a ceiling the backend applies on top of the
+ * (simulated-in-this-mode) score, not a re-derivation of it. Deliberately
+ * separate from `VerificationStatus`: that says what happened when ARIE
+ * tried to fetch the site, this says what the fetched evidence means. */
+export type DiscoverySuitability = "supported" | "uncertain" | "contradicted";
+
 export interface VerifiedCompanyFacts {
   business_relevance:
     "clearly_relevant" | "plausible" | "clearly_irrelevant" | "insufficient_content";
@@ -1302,6 +1309,8 @@ export interface Opportunity {
   verification_status: VerificationStatus | null;
   verified_facts: VerifiedCompanyFacts | null;
   website_verified_at: string | null;
+  suitability: DiscoverySuitability;
+  suitability_reason: string | null;
   is_contactable: boolean;
 }
 

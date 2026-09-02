@@ -1,4 +1,10 @@
-import type { ConfidenceBand, CustomerPriority, NextAction, ResearchStatus } from "@/lib/api/types";
+import type {
+  ConfidenceBand,
+  CustomerPriority,
+  DiscoverySuitability,
+  NextAction,
+  ResearchStatus,
+} from "@/lib/api/types";
 import type { BadgeTone } from "@/components/ui/Badge";
 
 /**
@@ -51,6 +57,26 @@ const CONFIDENCE_LABELS: Record<ConfidenceBand, string> = {
 
 export function confidenceBandLabel(band: ConfidenceBand): string {
   return CONFIDENCE_LABELS[band];
+}
+
+const SUITABILITY_LABELS: Record<DiscoverySuitability, string> = {
+  supported: "Website verified",
+  uncertain: "Evidence uncertain",
+  contradicted: "Evidence against fit",
+};
+
+export function suitabilityLabel(suitability: DiscoverySuitability): string {
+  return SUITABILITY_LABELS[suitability];
+}
+
+const SUITABILITY_TONES: Record<DiscoverySuitability, BadgeTone> = {
+  supported: "qualify",
+  uncertain: "pending",
+  contradicted: "reject",
+};
+
+export function suitabilityTone(suitability: DiscoverySuitability): BadgeTone {
+  return SUITABILITY_TONES[suitability];
 }
 
 const RESEARCH_STATUS_LABELS: Record<ResearchStatus, string> = {

@@ -1,10 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, ExternalLink, Mail, ShieldQuestion } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ExternalLink, Mail, ShieldQuestion } from "lucide-react";
 import clsx from "clsx";
 import type { BuyerSignal, EmailStatus, Opportunity, OpportunityNextAction } from "@/lib/api/types";
-import { nextActionLabel, priorityLabel, priorityTone } from "@/lib/format/recommendation";
+import {
+  nextActionLabel,
+  priorityLabel,
+  priorityTone,
+  suitabilityLabel,
+} from "@/lib/format/recommendation";
 import { Badge } from "@/components/ui/Badge";
 import { FeedbackButtons } from "@/components/lead/FeedbackButtons";
 
@@ -75,19 +80,28 @@ export function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
               {opportunity.domain}
               <ExternalLink className="h-3 w-3" strokeWidth={2} />
             </a>
-            {opportunity.verification_status === "verified" && (
+            {opportunity.suitability === "supported" && (
               <span className="inline-flex items-center gap-1 text-xs text-qualify">
                 <CheckCircle2 className="h-3 w-3" strokeWidth={2} />
-                Website verified
+                {suitabilityLabel(opportunity.suitability)}
               </span>
             )}
-            {opportunity.verification_status === "unavailable" && (
+            {opportunity.suitability === "uncertain" && (
               <span className="inline-flex items-center gap-1 text-xs text-text-faint">
                 <ShieldQuestion className="h-3 w-3" strokeWidth={2} />
-                Website not reachable
+                {suitabilityLabel(opportunity.suitability)}
+              </span>
+            )}
+            {opportunity.suitability === "contradicted" && (
+              <span className="inline-flex items-center gap-1 text-xs text-reject">
+                <AlertTriangle className="h-3 w-3" strokeWidth={2} />
+                {suitabilityLabel(opportunity.suitability)}
               </span>
             )}
           </div>
+          {opportunity.suitability !== "supported" && opportunity.suitability_reason && (
+            <p className="mt-1 text-xs text-text-faint italic">{opportunity.suitability_reason}</p>
+          )}
         </div>
         {opportunity.score !== null && (
           <div className="text-right">
@@ -134,6 +148,27 @@ export function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
           </p>
         </div>
       </div>
+
+      {opportunity.alternate_buyers.length > 0 && (
+        <div className="mt-3">
+          <p className="t-label text-text-faint">Also identified</p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {opportunity.alternate_buyers.slice(0, 2).map((alt, index) => (
+              <li key={index} className="text-xs text-text-dim">
+                {alt.name_known
+                  ? [alt.full_name, alt.title].filter(Boolean).join(" — ")
+                  : [alt.seniority, alt.function].filter(Boolean).join(" · ") ||
+                    "Role identified"}
+                {alt.email && (
+                  <Badge tone={hasUsableEmail(alt) ? "qualify" : "pending"} size="sm" className="ml-1.5">
+                    {EMAIL_STATUS_LABEL[alt.email_status ?? "none"]}
+                  </Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {(opportunity.key_evidence.length > 0 ||
         opportunity.missing_information.length > 0 ||

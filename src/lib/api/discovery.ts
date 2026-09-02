@@ -105,6 +105,8 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
       reasoning: "Fixed demo content — mock mode never fetches a real website.",
     },
     website_verified_at: new Date().toISOString(),
+    suitability: "supported",
+    suitability_reason: "A demo reading, not a real page fetch — mock mode has no Firecrawl call behind it.",
     is_contactable: true,
   },
   {
@@ -126,6 +128,9 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
     verification_status: "unavailable",
     verified_facts: null,
     website_verified_at: null,
+    suitability: "uncertain",
+    suitability_reason:
+      "ARIE could not read this company's own website, so nothing about this company is confirmed by public evidence yet.",
     is_contactable: false,
   },
   {
@@ -150,7 +155,32 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
       email_status: "none",
       profile_url: null,
     },
-    alternate_buyers: [],
+    alternate_buyers: [
+      {
+        seniority: "manager",
+        function: "operations",
+        name_known: true,
+        source: "mock_hunter_domain_search",
+        confidence: 0.52,
+        full_name: "Wei Chen",
+        title: "Warehouse Manager",
+        email: "wei.chen@ironbarkdist.example",
+        email_status: "unverified",
+        profile_url: null,
+      },
+      {
+        seniority: "c_level",
+        function: "finance",
+        name_known: false,
+        source: "mock_hunter_domain_search",
+        confidence: 0.35,
+        full_name: null,
+        title: null,
+        email: null,
+        email_status: "none",
+        profile_url: null,
+      },
+    ],
     research_performed: false,
     discovery_source: "mock_discovery",
     source_url: "https://ironbarkdist.example",
@@ -170,6 +200,8 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
       reasoning: "Fixed demo content — mock mode never fetches a real website.",
     },
     website_verified_at: new Date().toISOString(),
+    suitability: "supported",
+    suitability_reason: "Fixed demo content — mock mode never fetches a real website.",
     is_contactable: false,
   },
   {
@@ -191,6 +223,9 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
     verification_status: "unavailable",
     verified_facts: null,
     website_verified_at: null,
+    suitability: "uncertain",
+    suitability_reason:
+      "ARIE could not read this company's own website, so nothing about this company is confirmed by public evidence yet.",
     is_contactable: false,
   },
   {
@@ -223,6 +258,8 @@ const MOCK_OPPORTUNITIES: readonly Omit<Opportunity, "candidate_id" | "lead_id">
       reasoning: "Fixed demo content: this template shows what a rejected verification looks like.",
     },
     website_verified_at: new Date().toISOString(),
+    suitability: "contradicted",
+    suitability_reason: "Fixed demo content: this template shows what a rejected verification looks like.",
     is_contactable: false,
   },
 ] as const;
