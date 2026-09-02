@@ -7,10 +7,13 @@ import type {
   BillingPortalResponse,
   BillingResponse,
   CheckoutSessionResponse,
+  ConfidenceBand,
   CreateICPProfileRequest,
   CreateInvitationRequest,
   CreateOrganizationRequest,
   CreateOrganizationResponse,
+  CustomerPriority,
+  FeedbackResponse,
   HealthResponse,
   ICPProfile,
   ICPProfileConfig,
@@ -18,9 +21,12 @@ import type {
   IngestLeadResponse,
   InvitationCreatedResponse,
   InvitationResponse,
+  LeadExplanationResponse,
+  LeadRecommendationResponse,
   LeadResponse,
   LeadStatus,
   MemberResponse,
+  NextAction,
   OnboardingStatusResponse,
   OrganizationResponse,
   ProviderId,
@@ -29,6 +35,7 @@ import type {
   ReviewDecisionRequest,
   ReviewDecisionResponse,
   ReviewResponse,
+  SubmitFeedbackRequest,
   SetProviderCredentialRequest,
   SetProviderEnabledRequest,
   UpdateMemberRoleRequest,
@@ -36,7 +43,13 @@ import type {
   UsageAgainstLimitsResponse,
   UsageSummary,
 } from "../types";
-import { ROLES, SUPPORTED_PROVIDERS } from "../types";
+import {
+  AWAITING_REVIEW_STATUSES,
+  FAILURE_STATUSES,
+  REJECTED_STATUSES,
+  ROLES,
+  SUPPORTED_PROVIDERS,
+} from "../types";
 
 /**
  * Mock mode's entire "backend" — no network, no Docker. Exists for
@@ -388,6 +401,121 @@ function isSettled(lead: MockLead, nowMs: number): boolean {
   return nowMs - lead.createdAtMs >= STAGE_BOUNDS_MS.SETTLED;
 }
 
+// ------------------------------------------------------- M7 Slice 4 mock --
+//
+// Mirrors `arie.recommendations`' deterministic rules closely enough for a
+// demo — never imported from a shared module, because the real rules live
+// once, on the backend; this is mock mode's own restatement, kept small.
+
+const FIELD_LABELS: Record<string, string> = {
+  employee_count: "company size",
+  industry: "industry",
+  title_seniority: "contact seniority",
+  title_function: "contact function",
+  buying_intent: "buying intent",
+  recent_trigger_event: "a recent trigger event",
+  disqualifying_flag: "a disqualifying condition",
+};
+
+function deriveRecommendation(receipt: ReceiptResponse): LeadRecommendationResponse {
+  const known = receipt.evidence.items
+    .filter((item) => item.field !== "disqualifying_flag")
+    .map((item) => FIELD_LABELS[item.field] ?? item.field);
+  const missing = receipt.evidence.unknown_fields.map((field) => FIELD_LABELS[field] ?? field);
+
+  let priority: CustomerPriority;
+  if (receipt.status !== "decided") {
+    priority = "review";
+  } else if (
+    FAILURE_STATUSES.includes(receipt.lead_status) ||
+    AWAITING_REVIEW_STATUSES.includes(receipt.lead_status)
+  ) {
+    priority = "review";
+  } else if (REJECTED_STATUSES.includes(receipt.lead_status)) {
+    priority = "skip";
+  } else {
+    const confidence = receipt.score?.confidence ?? 0;
+    priority =
+      receipt.decision?.recommended_action === "auto_route" && confidence >= 0.75
+        ? "contact_first"
+        : "worth_pursuing";
+  }
+
+  const hasDecisionMakerContact = !receipt.evidence.unknown_fields.includes("title_seniority");
+  let nextAction: NextAction;
+  if (receipt.status !== "decided") {
+    nextAction = "research_more";
+  } else if (FAILURE_STATUSES.includes(receipt.lead_status)) {
+    nextAction = "human_review";
+  } else if (AWAITING_REVIEW_STATUSES.includes(receipt.lead_status)) {
+    nextAction = "human_review";
+  } else if (priority === "skip") {
+    nextAction = "skip";
+  } else if (priority === "contact_first") {
+    nextAction = hasDecisionMakerContact ? "contact_now" : "find_decision_maker";
+  } else if (priority === "worth_pursuing") {
+    nextAction = !hasDecisionMakerContact
+      ? "find_decision_maker"
+      : missing.length > 0
+        ? "email_first"
+        : "nurture";
+  } else {
+    nextAction = "research_more";
+  }
+
+  let shortReason: string;
+  if (receipt.status !== "decided") {
+    shortReason = "ARIE is still gathering evidence on this lead.";
+  } else if (AWAITING_REVIEW_STATUSES.includes(receipt.lead_status)) {
+    shortReason = "This lead is waiting on a human review before it can move forward.";
+  } else if (priority === "skip") {
+    shortReason = "This lead falls outside your targeting profile.";
+  } else {
+    const strength = priority === "contact_first" ? "Strong match" : "Possible match";
+    shortReason =
+      known.length > 0
+        ? `${strength} based on ${known.slice(0, 3).join(", ")}.`
+        : `${strength}, though little evidence has been gathered yet.`;
+    if (missing.length > 0) shortReason += ` ${capitalize(missing[0])} is still unknown.`;
+  }
+
+  const confidenceBand: ConfidenceBand | null =
+    receipt.score === null
+      ? null
+      : receipt.score.confidence >= 0.75
+        ? "high"
+        : receipt.score.confidence >= 0.45
+          ? "medium"
+          : "low";
+
+  return {
+    lead_id: receipt.lead_id,
+    priority,
+    next_action: nextAction,
+    machine_decision: receipt.decision?.recommended_action ?? null,
+    score: receipt.score?.value ?? null,
+    confidence: receipt.score?.confidence ?? null,
+    confidence_band: confidenceBand,
+    short_reason: shortReason,
+    key_evidence: known,
+    missing_information: missing,
+    research_status:
+      receipt.status !== "decided"
+        ? "not_performed"
+        : receipt.providers.called.length === 0
+          ? "not_performed"
+          : "researched",
+    explanation_status: "not_requested",
+    profile_version: receipt.versions?.icp_profile_version ?? null,
+    shadow: receipt.shadow,
+    execution_mode: "simulated",
+  };
+}
+
+function capitalize(text: string): string {
+  return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
+}
+
 const MOCK_USER_ID = "mock-user";
 const MOCK_ORG_ID = "mock-org";
 
@@ -479,6 +607,10 @@ class MockArieStore {
   private icpProfiles: ICPProfile[] = defaultICPProfiles();
   private batches: Batch[] = [];
   private batchRows = new Map<string, BatchRow[]>();
+  /** M7 Slice 4. In-memory only (not persisted to `localStorage` like the
+   * lead store above) — a demo-mode opinion surviving a refresh isn't worth
+   * the added persistence surface. */
+  private feedback = new Map<string, FeedbackResponse>();
 
   // --- Productization M4: organization, members, invitations, providers,
   // onboarding, limits (mock, in-memory) --------------------------------
@@ -516,6 +648,7 @@ class MockArieStore {
     this.icpProfiles = defaultICPProfiles();
     this.batches = [];
     this.batchRows = new Map();
+    this.feedback = new Map();
     this.organization = defaultOrganization();
     this.members = defaultMembers();
     this.invitations = [];
@@ -750,6 +883,55 @@ class MockArieStore {
     };
   }
 
+  // ------------------------------------------------- M7 Slice 4: mock only --
+
+  getRecommendation(leadId: string): LeadRecommendationResponse {
+    return deriveRecommendation(this.getReceipt(leadId));
+  }
+
+  getExplanation(leadId: string): LeadExplanationResponse {
+    const recommendation = this.getRecommendation(leadId);
+    return {
+      summary: recommendation.short_reason,
+      claims: recommendation.key_evidence.slice(0, 3).map((label) => ({
+        text: `${capitalize(label)} matches your targeting profile.`,
+        evidence_ids: [],
+        hypothesis: false,
+      })),
+      missing_information: recommendation.missing_information,
+      hypothesis_notes: [],
+      // Mock mode never calls a model — see this file's own docstring.
+      source: "deterministic",
+      unavailable_reason: null,
+    };
+  }
+
+  submitFeedback(leadId: string, request: SubmitFeedbackRequest): FeedbackResponse {
+    this.requireLead(leadId);
+    const recommendation = this.getRecommendation(leadId);
+    const now = new Date().toISOString();
+    const existing = this.feedback.get(leadId);
+    const record: FeedbackResponse = {
+      feedback_id: existing?.feedback_id ?? crypto.randomUUID(),
+      lead_id: leadId,
+      profile_version: recommendation.profile_version,
+      recommendation_priority: recommendation.priority,
+      recommendation_next_action: recommendation.next_action,
+      sentiment: request.sentiment,
+      reason: request.reason ?? null,
+      note: request.note ?? null,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    };
+    this.feedback.set(leadId, record);
+    return record;
+  }
+
+  getFeedback(leadId: string): FeedbackResponse | null {
+    this.requireLead(leadId);
+    return this.feedback.get(leadId) ?? null;
+  }
+
   getReview(reviewId: string): ReviewResponse {
     const store = this.get();
     const leadId = store.reviewIdToLeadId[reviewId];
@@ -906,6 +1088,10 @@ class MockArieStore {
         validation_error: valid ? null : "email is required or unrecognizable",
         lead_id: leadId,
         lead_status: valid ? "AUTO_ROUTED" : null,
+        priority: valid ? "contact_first" : null,
+        next_action: valid ? "contact_now" : null,
+        short_reason: valid ? "Strong match based on your targeting profile." : null,
+        confidence_band: valid ? "high" : null,
       };
     });
     const acceptedRows = records.filter((r) => r.validation_status === "accepted").length;

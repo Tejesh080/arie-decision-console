@@ -12,6 +12,7 @@ import {
   ServerCrash,
 } from "lucide-react";
 import { getReceipt } from "@/lib/api/receipts";
+import { getRecommendation } from "@/lib/api/leads";
 import { getReview } from "@/lib/api/reviews";
 import { pollLeadUntilSettled } from "@/lib/api/polling";
 import {
@@ -20,7 +21,12 @@ import {
   ArieTimeoutError,
   ArieUnavailableError,
 } from "@/lib/api/errors";
-import type { LeadStatus, ReceiptResponse, ReviewResponse } from "@/lib/api/types";
+import type {
+  LeadRecommendationResponse,
+  LeadStatus,
+  ReceiptResponse,
+  ReviewResponse,
+} from "@/lib/api/types";
 import { getRecentLeads, updateRecentLead } from "@/lib/localHistory";
 import { formatDateTime, formatUsd, statusLabel } from "@/lib/format";
 import { costNoun, costCaveat, isSimulated } from "@/lib/api/providerMode";
@@ -35,6 +41,7 @@ import { WhoDecided } from "@/components/receipt/WhoDecided";
 import { EvidencePanel } from "@/components/receipt/EvidencePanel";
 import { HumanReviewPanel } from "@/components/receipt/HumanReviewPanel";
 import { ProcessingRail } from "@/components/receipt/ProcessingRail";
+import { RecommendationPanel } from "@/components/lead/RecommendationPanel";
 import { DURATION, EASE_OUT } from "@/lib/motion";
 
 type LoadState = "loading" | "ready" | "not-found" | "unavailable" | "error";
@@ -43,6 +50,7 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptResponse | null>(null);
+  const [recommendation, setRecommendation] = useState<LeadRecommendationResponse | null>(null);
   const [review, setReview] = useState<ReviewResponse | null>(null);
   const [liveStatus, setLiveStatus] = useState<LeadStatus | null>(null);
   const [pollTimedOut, setPollTimedOut] = useState(false);
@@ -93,6 +101,15 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
         setReview(rev);
       } else {
         setReview(null);
+      }
+
+      // Best-effort: a recommendation failure never blocks the receipt this
+      // page already has, and it degrades to nothing being rendered rather
+      // than the whole page erroring out over the secondary surface.
+      try {
+        setRecommendation(await getRecommendation(leadId));
+      } catch {
+        setRecommendation(null);
       }
     } catch (err) {
       if (err instanceof ArieNotFoundError) {
@@ -207,6 +224,10 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
         <ProcessingRail liveStatus={liveStatus} timedOut={pollTimedOut} onRefresh={refresh} />
       )}
 
+      {recommendation && receipt.status !== "pending" && (
+        <RecommendationPanel leadId={leadId} recommendation={recommendation} />
+      )}
+
       {receipt.status === "processing_failed" && (
         <Panel accent="reject">
           <Eyebrow>Couldn&apos;t evaluate</Eyebrow>
@@ -245,14 +266,12 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
           transition={reduced ? { duration: 0 } : { duration: DURATION.slow, ease: EASE_OUT }}
           className="flex flex-col gap-5"
         >
-          <VerdictPanel receipt={receipt} />
-
-          <StopFlow receipt={receipt} />
-
           {/* The chain only exists when a person was actually involved. For a
               purely autonomous decision there is no human stage to draw, and
               inventing one would imply oversight that never happened -- but
-              the question still gets answered, by WhoDecided below. */}
+              the question still gets answered, by WhoDecided below. Kept
+              outside "Advanced Details" -- an open review needs action, not
+              a collapsed accordion. */}
           {receipt.human_review && review && !receipt.shadow ? (
             <HumanReviewPanel
               review={review}
@@ -270,133 +289,175 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
             <WhoDecided receipt={receipt} />
           )}
 
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
-            <div className="flex min-w-0 flex-col gap-5">
-              <Panel as="section">
-                <Eyebrow>Scoring</Eyebrow>
-                <h2 className="t-h3 mt-1.5 text-text">Where the score landed</h2>
-                <div className="mt-5">
-                  <ScoreBand
-                    value={receipt.score.value}
-                    lower={receipt.score.bounds.lower}
-                    upper={receipt.score.bounds.upper}
-                    thresholdReject={receipt.score.threshold_reject}
-                    thresholdQualify={receipt.score.threshold_qualify}
-                  />
-                </div>
-              </Panel>
+          {/* Advanced Details: the technical Decision Receipt this page used
+              to lead with -- verdict, stop reason, score, evidence ledger,
+              cost, and provenance. Demoted, not deleted; open by default
+              only while a review is still awaiting a response, since that
+              is the one case where a reader is likely mid-investigation. */}
+          <details
+            className="group/advanced"
+            open={Boolean(receipt.human_review && !receipt.human_review.responded_at)}
+          >
+            <summary className="surface-flat flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-border-loud">
+              <span className="min-w-0">
+                <Eyebrow>Advanced details</Eyebrow>
+                <span className="mt-1 block text-sm text-text-dim">
+                  The Decision Receipt — score, stopping reason, evidence, cost, and provenance
+                </span>
+              </span>
+              <ChevronRight
+                aria-hidden
+                className="h-4 w-4 shrink-0 text-text-faint transition-transform duration-200 group-open/advanced:rotate-90"
+                strokeWidth={2}
+              />
+            </summary>
 
-              {/* Collapsed by default: the verdict panel's "What it used"
-                  line carries the counts; the full ledger is reference
-                  material, not part of the first read. */}
-              <details className="group/evidence">
-                <summary className="surface-flat flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-border-loud">
-                  <span className="min-w-0">
-                    <Eyebrow>Evidence</Eyebrow>
-                    <span className="mt-1 block text-sm text-text-dim">
-                      Every check ARIE made, what each returned, and what each cost
-                    </span>
-                  </span>
-                  <ChevronRight
-                    aria-hidden
-                    className="h-4 w-4 shrink-0 text-text-faint transition-transform duration-200 group-open/evidence:rotate-90"
-                    strokeWidth={2}
-                  />
-                </summary>
-                <div className="mt-4">
-                  <EvidencePanel providers={receipt.providers} evidence={receipt.evidence} />
-                </div>
-              </details>
-            </div>
+            <div className="mt-4 flex flex-col gap-5">
+              <VerdictPanel receipt={receipt} />
 
-            <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
-              <p className="t-label text-text-faint">Technical details</p>
-              <Panel padding="sm">
-                <Eyebrow>{costNoun()}</Eyebrow>
-                <dl className="mt-3 flex flex-col gap-2 text-sm">
-                  <CostRow label="Providers" value={formatUsd(receipt.cost.provider_cost_usd)} />
-                  <CostRow label="Model" value={formatUsd(receipt.cost.model_cost_usd)} />
-                  <CostRow label="Total" value={formatUsd(receipt.cost.total_cost_usd)} strong />
-                  <CostRow
-                    label="Budget cap"
-                    value={formatUsd(receipt.cost.budget_usd_cap)}
-                    muted
-                  />
-                </dl>
-                {isSimulated() && (
-                  <p className="mt-3 border-t border-border pt-2.5 text-[0.6875rem] leading-relaxed text-text-faint">
-                    {costCaveat()}
-                  </p>
-                )}
-              </Panel>
+              <StopFlow receipt={receipt} />
 
-              <Panel padding="sm">
-                <Eyebrow>Provenance</Eyebrow>
-                <dl className="mt-3 flex flex-col gap-2 text-sm">
-                  <CostRow label="Policy" value={receipt.versions?.policy ?? "—"} mono />
-                  <CostRow label="Scorer" value={receipt.versions?.scorer ?? "—"} mono />
-                  <CostRow
-                    label="Calibration"
-                    value={receipt.versions?.confidence_calibration ?? "—"}
-                    mono
-                  />
-                  <CostRow label="Receipt" value={`v${receipt.receipt_version}`} mono muted />
-                  {receipt.stopping && (
-                    <CostRow label="Stop rule" value={receipt.stopping.reason_code} mono muted />
-                  )}
-                </dl>
-                <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2.5">
-                  <span className="text-xs text-text-faint">Lead ID</span>
-                  <IdChip value={leadId} truncate />
-                </div>
-                <p className="mt-3 border-t border-border pt-2.5 text-[0.6875rem] text-text-faint">
-                  Decided {formatDateTime(receipt.created_at)}
-                </p>
-              </Panel>
-
-              {receipt.human_review && (
-                <Panel padding="sm">
-                  <Eyebrow>Review record</Eyebrow>
-                  <div className="mt-3 flex flex-col gap-2 text-sm">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs text-text-faint">Review ID</span>
-                      <IdChip value={receipt.human_review.review_id} truncate />
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
+                <div className="flex min-w-0 flex-col gap-5">
+                  <Panel as="section">
+                    <Eyebrow>Scoring</Eyebrow>
+                    <h2 className="t-h3 mt-1.5 text-text">Where the score landed</h2>
+                    <div className="mt-5">
+                      <ScoreBand
+                        value={receipt.score.value}
+                        lower={receipt.score.bounds.lower}
+                        upper={receipt.score.bounds.upper}
+                        thresholdReject={receipt.score.threshold_reject}
+                        thresholdQualify={receipt.score.threshold_qualify}
+                      />
                     </div>
-                    <CostRow
-                      label="Reviewer"
-                      value={receipt.human_review.reviewer ?? "Unassigned"}
-                    />
-                    <CostRow
-                      label="Responded"
-                      value={
-                        receipt.human_review.responded_at
-                          ? formatDateTime(receipt.human_review.responded_at)
-                          : "Pending"
-                      }
-                    />
-                  </div>
-                </Panel>
-              )}
+                  </Panel>
 
-              <details className="surface-flat group px-4 py-3">
-                <summary className="t-label flex cursor-pointer list-none items-center gap-1.5 text-text-faint transition-colors hover:text-text-dim">
-                  <ChevronRight
-                    aria-hidden
-                    className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
-                    strokeWidth={2.25}
-                  />
-                  Developer details
-                </summary>
-                <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-faint">
-                  The exact <code className="t-data">GET /leads/{"{id}"}/receipt</code> response
-                  backing this page.
-                </p>
-                <pre className="scroll-x mt-2 max-h-80 overflow-y-auto rounded-md border border-border bg-bg-sunken p-3 text-[0.6875rem] leading-relaxed text-text-dim">
-                  {JSON.stringify(receipt, null, 2)}
-                </pre>
-              </details>
-            </aside>
-          </div>
+                  {/* Collapsed by default: the verdict panel's "What it used"
+                      line carries the counts; the full ledger is reference
+                      material, not part of the first read. */}
+                  <details className="group/evidence">
+                    <summary className="surface-flat flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-border-loud">
+                      <span className="min-w-0">
+                        <Eyebrow>Evidence</Eyebrow>
+                        <span className="mt-1 block text-sm text-text-dim">
+                          Every check ARIE made, what each returned, and what each cost
+                        </span>
+                      </span>
+                      <ChevronRight
+                        aria-hidden
+                        className="h-4 w-4 shrink-0 text-text-faint transition-transform duration-200 group-open/evidence:rotate-90"
+                        strokeWidth={2}
+                      />
+                    </summary>
+                    <div className="mt-4">
+                      <EvidencePanel providers={receipt.providers} evidence={receipt.evidence} />
+                    </div>
+                  </details>
+                </div>
+
+                <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-20 lg:self-start">
+                  <p className="t-label text-text-faint">Technical details</p>
+                  <Panel padding="sm">
+                    <Eyebrow>{costNoun()}</Eyebrow>
+                    <dl className="mt-3 flex flex-col gap-2 text-sm">
+                      <CostRow
+                        label="Providers"
+                        value={formatUsd(receipt.cost.provider_cost_usd)}
+                      />
+                      <CostRow label="Model" value={formatUsd(receipt.cost.model_cost_usd)} />
+                      <CostRow
+                        label="Total"
+                        value={formatUsd(receipt.cost.total_cost_usd)}
+                        strong
+                      />
+                      <CostRow
+                        label="Budget cap"
+                        value={formatUsd(receipt.cost.budget_usd_cap)}
+                        muted
+                      />
+                    </dl>
+                    {isSimulated() && (
+                      <p className="mt-3 border-t border-border pt-2.5 text-[0.6875rem] leading-relaxed text-text-faint">
+                        {costCaveat()}
+                      </p>
+                    )}
+                  </Panel>
+
+                  <Panel padding="sm">
+                    <Eyebrow>Provenance</Eyebrow>
+                    <dl className="mt-3 flex flex-col gap-2 text-sm">
+                      <CostRow label="Policy" value={receipt.versions?.policy ?? "—"} mono />
+                      <CostRow label="Scorer" value={receipt.versions?.scorer ?? "—"} mono />
+                      <CostRow
+                        label="Calibration"
+                        value={receipt.versions?.confidence_calibration ?? "—"}
+                        mono
+                      />
+                      <CostRow label="Receipt" value={`v${receipt.receipt_version}`} mono muted />
+                      {receipt.stopping && (
+                        <CostRow
+                          label="Stop rule"
+                          value={receipt.stopping.reason_code}
+                          mono
+                          muted
+                        />
+                      )}
+                    </dl>
+                    <div className="mt-3 flex flex-col gap-1 border-t border-border pt-2.5">
+                      <span className="text-xs text-text-faint">Lead ID</span>
+                      <IdChip value={leadId} truncate />
+                    </div>
+                    <p className="mt-3 border-t border-border pt-2.5 text-[0.6875rem] text-text-faint">
+                      Decided {formatDateTime(receipt.created_at)}
+                    </p>
+                  </Panel>
+
+                  {receipt.human_review && (
+                    <Panel padding="sm">
+                      <Eyebrow>Review record</Eyebrow>
+                      <div className="mt-3 flex flex-col gap-2 text-sm">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-text-faint">Review ID</span>
+                          <IdChip value={receipt.human_review.review_id} truncate />
+                        </div>
+                        <CostRow
+                          label="Reviewer"
+                          value={receipt.human_review.reviewer ?? "Unassigned"}
+                        />
+                        <CostRow
+                          label="Responded"
+                          value={
+                            receipt.human_review.responded_at
+                              ? formatDateTime(receipt.human_review.responded_at)
+                              : "Pending"
+                          }
+                        />
+                      </div>
+                    </Panel>
+                  )}
+
+                  <details className="surface-flat group px-4 py-3">
+                    <summary className="t-label flex cursor-pointer list-none items-center gap-1.5 text-text-faint transition-colors hover:text-text-dim">
+                      <ChevronRight
+                        aria-hidden
+                        className="h-3.5 w-3.5 transition-transform duration-200 group-open:rotate-90"
+                        strokeWidth={2.25}
+                      />
+                      Developer details
+                    </summary>
+                    <p className="mt-2 text-[0.6875rem] leading-relaxed text-text-faint">
+                      The exact <code className="t-data">GET /leads/{"{id}"}/receipt</code> response
+                      backing this page.
+                    </p>
+                    <pre className="scroll-x mt-2 max-h-80 overflow-y-auto rounded-md border border-border bg-bg-sunken p-3 text-[0.6875rem] leading-relaxed text-text-dim">
+                      {JSON.stringify(receipt, null, 2)}
+                    </pre>
+                  </details>
+                </aside>
+              </div>
+            </div>
+          </details>
         </motion.div>
       )}
     </div>

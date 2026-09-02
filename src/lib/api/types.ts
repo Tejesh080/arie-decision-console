@@ -253,6 +253,99 @@ export interface ReceiptResponse {
   human_review: ReceiptHumanReview | null;
 }
 
+// ------------------------------------------------------- recommendation --
+//
+// M7 Slice 4. `arie.recommendations`/`arie.intelligence.explanation` on the
+// backend. This is the primary product surface a customer sees for a lead;
+// `ReceiptResponse` above remains available under "Advanced Details".
+
+export type CustomerPriority = "contact_first" | "worth_pursuing" | "review" | "skip";
+
+export type NextAction =
+  | "contact_now"
+  | "email_first"
+  | "find_decision_maker"
+  | "research_more"
+  | "nurture"
+  | "skip"
+  | "human_review";
+
+export type ConfidenceBand = "high" | "medium" | "low";
+
+export type ResearchStatus =
+  "not_needed" | "not_performed" | "researched" | "partial" | "unavailable";
+
+export interface LeadRecommendationResponse {
+  lead_id: string;
+  priority: CustomerPriority;
+  next_action: NextAction;
+  machine_decision: string | null;
+  score: number | null;
+  confidence: number | null;
+  confidence_band: ConfidenceBand | null;
+  short_reason: string;
+  key_evidence: string[];
+  missing_information: string[];
+  research_status: ResearchStatus;
+  explanation_status: string;
+  profile_version: number | null;
+  shadow: boolean;
+  execution_mode: string | null;
+}
+
+export interface EvidenceGroundedClaim {
+  text: string;
+  evidence_ids: string[];
+  hypothesis: boolean;
+}
+
+/** `POST /leads/{lead_id}/explanation`. `source` tells the caller whether
+ * `claims`/`summary` are AI-authored or ARIE's own deterministic fallback —
+ * always shown to the customer, never hidden. */
+export interface LeadExplanationResponse {
+  summary: string;
+  claims: EvidenceGroundedClaim[];
+  missing_information: string[];
+  hypothesis_notes: string[];
+  source: "ai" | "deterministic";
+  unavailable_reason: string | null;
+}
+
+// ------------------------------------------------------------- feedback --
+
+export type FeedbackSentiment = "positive" | "negative";
+
+export type FeedbackReason =
+  | "good_match"
+  | "bad_match"
+  | "wrong_person"
+  | "company_too_small"
+  | "company_too_large"
+  | "wrong_industry"
+  | "not_decision_maker"
+  | "already_customer"
+  | "not_interested"
+  | "other";
+
+export interface SubmitFeedbackRequest {
+  sentiment: FeedbackSentiment;
+  reason?: FeedbackReason | null;
+  note?: string | null;
+}
+
+export interface FeedbackResponse {
+  feedback_id: string;
+  lead_id: string;
+  profile_version: number | null;
+  recommendation_priority: string;
+  recommendation_next_action: string;
+  sentiment: FeedbackSentiment;
+  reason: FeedbackReason | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // -------------------------------------------------------------- reviews --
 
 export interface ReviewResponse {
@@ -381,6 +474,13 @@ export interface BatchRow {
   validation_error: string | null;
   lead_id: string | null;
   lead_status: LeadStatus | null;
+  /** M7 Slice 4 — the customer-facing projection, `null` wherever `lead_id`
+   * is `null` for the identical reason. Computed deterministically in one
+   * bulk query; never a per-row AI call. */
+  priority: CustomerPriority | null;
+  next_action: NextAction | null;
+  short_reason: string | null;
+  confidence_band: ConfidenceBand | null;
 }
 
 export interface BatchRowsPage {

@@ -373,9 +373,7 @@ describe("mockStore — Productization M4", () => {
 
       const created = store.createInvitation({ email: "once@example.com", role: "admin" });
       store.acceptInvitation({ token: created.raw_token });
-      expect(() => store.acceptInvitation({ token: created.raw_token })).toThrow(
-        ArieNotFoundError,
-      );
+      expect(() => store.acceptInvitation({ token: created.raw_token })).toThrow(ArieNotFoundError);
 
       const revocable = store.createInvitation({ email: "revoked@example.com", role: "admin" });
       store.revokeInvitation(revocable.invitation_id);
@@ -395,9 +393,9 @@ describe("mockStore — Productization M4", () => {
         caught = err;
       }
       expect((caught as { status?: number }).status).toBe(410);
-      expect(store.listInvitations().find((i) => i.invitation_id === created.invitation_id)?.status).toBe(
-        "expired",
-      );
+      expect(
+        store.listInvitations().find((i) => i.invitation_id === created.invitation_id)?.status,
+      ).toBe("expired");
     });
 
     it("revokes a pending invitation", () => {
@@ -440,16 +438,16 @@ describe("mockStore — Productization M4", () => {
 
     it("404s configuring an unknown provider", () => {
       const store = freshStore();
-      expect(() =>
-        store.setProviderCredential("unknown_provider", { credential: "x" }),
-      ).toThrow(ArieNotFoundError);
+      expect(() => store.setProviderCredential("unknown_provider", { credential: "x" })).toThrow(
+        ArieNotFoundError,
+      );
     });
 
     it("refuses to enable/disable/test/remove an unconfigured provider", () => {
       const store = freshStore();
-      expect(() =>
-        store.setProviderEnabled("apollo_person_enrichment", { enabled: true }),
-      ).toThrow(ArieNotFoundError);
+      expect(() => store.setProviderEnabled("apollo_person_enrichment", { enabled: true })).toThrow(
+        ArieNotFoundError,
+      );
       expect(() => store.testProviderConnection("apollo_person_enrichment")).toThrow(
         ArieNotFoundError,
       );
@@ -512,6 +510,105 @@ describe("mockStore — Productization M4", () => {
       const limits = store.getUsageAgainstLimits();
       expect(limits.leads_remaining).toBe(limits.leads_limit - limits.leads_used);
       expect(limits.max_csv_rows_per_upload).toBeGreaterThan(0);
+    });
+  });
+
+  // ---------------------------------------------------- M7 Slice 4: mock --
+
+  describe("recommendation", () => {
+    it("derives contact_first for the autonomous demo identity once settled", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.delacroix@lumen500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const recommendation = store.getRecommendation(lead_id);
+      expect(recommendation.priority).toBe("contact_first");
+      expect(recommendation.next_action).not.toBe("human_review");
+      expect(recommendation.explanation_status).toBe("not_requested");
+    });
+
+    it("derives review for the escalation demo identity awaiting a decision", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.haddad@cobalt500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const recommendation = store.getRecommendation(lead_id);
+      expect(recommendation.priority).toBe("review");
+      expect(recommendation.next_action).toBe("human_review");
+    });
+
+    it("is review, not skip, for a lead still mid-pipeline", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({ source: "test", email: "a@b.com" });
+
+      const recommendation = store.getRecommendation(lead_id);
+      expect(recommendation.priority).toBe("review");
+      expect(recommendation.score).toBeNull();
+    });
+
+    it("getExplanation never calls a model — source is always deterministic", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.delacroix@lumen500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const explanation = store.getExplanation(lead_id);
+      expect(explanation.source).toBe("deterministic");
+      for (const claim of explanation.claims) {
+        expect(claim.hypothesis).toBe(false);
+      }
+    });
+  });
+
+  describe("feedback", () => {
+    it("returns null before any feedback has been submitted", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({ source: "test", email: "a@b.com" });
+      expect(store.getFeedback(lead_id)).toBeNull();
+    });
+
+    it("submits and reads back feedback tied to the current recommendation", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.delacroix@lumen500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const submitted = store.submitFeedback(lead_id, { sentiment: "positive" });
+      expect(submitted.recommendation_priority).toBe("contact_first");
+      expect(store.getFeedback(lead_id)).toEqual(submitted);
+    });
+
+    it("changing feedback replaces the same row rather than creating a new one", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({ source: "test", email: "a@b.com" });
+
+      const first = store.submitFeedback(lead_id, { sentiment: "positive" });
+      const second = store.submitFeedback(lead_id, {
+        sentiment: "negative",
+        reason: "wrong_industry",
+      });
+
+      expect(second.feedback_id).toBe(first.feedback_id);
+      expect(second.sentiment).toBe("negative");
+      expect(second.reason).toBe("wrong_industry");
+    });
+
+    it("throws ArieNotFoundError for an unknown lead", () => {
+      const store = freshStore();
+      expect(() => store.getFeedback("no-such-lead")).toThrow(ArieNotFoundError);
+      expect(() => store.submitFeedback("no-such-lead", { sentiment: "positive" })).toThrow(
+        ArieNotFoundError,
+      );
     });
   });
 });

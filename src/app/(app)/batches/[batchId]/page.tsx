@@ -6,10 +6,11 @@ import Link from "next/link";
 import { ArrowLeft, CircleAlert } from "lucide-react";
 import { getBatch, listBatchRows } from "@/lib/api/batches";
 import { ArieNotFoundError } from "@/lib/api/errors";
-import type { Batch, BatchRowsPage } from "@/lib/api/types";
+import type { Batch, BatchRow, BatchRowsPage, CustomerPriority } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
 import { costNoun, costCaveat } from "@/lib/api/providerMode";
 import { formatUsd } from "@/lib/format";
+import { priorityLabel, priorityTone } from "@/lib/format/recommendation";
 import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +18,18 @@ import { StatRow, Stat } from "@/components/ui/Stat";
 
 const POLL_MS = 3000;
 const ROWS_PER_PAGE = 50;
+
+/** M7 Slice 4, Part K — the customer-facing grouping. Filters only the
+ * currently loaded page (see the row count note near its render): the
+ * primary use is a customer scanning "who matters" within one upload, not a
+ * global cross-page query. */
+const PRIORITY_TABS: readonly (CustomerPriority | "all")[] = [
+  "all",
+  "contact_first",
+  "worth_pursuing",
+  "review",
+  "skip",
+];
 
 export default function BatchDetailPage() {
   const params = useParams<{ batchId: string }>();
@@ -28,6 +41,7 @@ export default function BatchDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [priorityFilter, setPriorityFilter] = useState<CustomerPriority | "all">("all");
 
   const refresh = useCallback(async () => {
     try {
@@ -169,30 +183,72 @@ export default function BatchDetailPage() {
 
       <section>
         <h2 className="t-h3 mb-3 text-text">Rows</h2>
+
+        {rows && rows.items.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {PRIORITY_TABS.map((tab) => {
+              const count =
+                tab === "all"
+                  ? rows.items.length
+                  : rows.items.filter((r) => r.priority === tab).length;
+              const active = priorityFilter === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setPriorityFilter(tab)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    active
+                      ? "border-border-loud bg-surface-2 text-text"
+                      : "border-border-strong text-text-faint hover:text-text-dim"
+                  }`}
+                >
+                  {tab === "all" ? "All" : priorityLabel(tab)}
+                  <span className="ml-1.5 tabular-nums text-text-faint">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {rows && rows.items.length > 0 ? (
           <>
             <div className="scroll-x rounded-md border border-border">
-              <table className="w-full min-w-[36rem] border-collapse text-left">
+              <table className="w-full min-w-[42rem] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-border bg-bg-sunken">
                     <Th>#</Th>
                     <Th>Email</Th>
+                    <Th>Priority</Th>
+                    <Th>Why</Th>
                     <Th>Status</Th>
-                    <Th>Lead status</Th>
-                    <Th align="right">Receipt</Th>
+                    <Th align="right">Lead</Th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.items.map((row) => (
+                  {filterRows(rows.items, priorityFilter).map((row) => (
                     <tr key={row.row_number} className="border-b border-border last:border-0">
                       <td className="t-data px-3 py-2.5 text-text-faint">{row.row_number}</td>
                       <td className="t-data px-3 py-2.5 text-text">
                         {row.raw_row.email ?? row.raw_row.Email ?? "—"}
                       </td>
                       <td className="px-3 py-2.5">
+                        {row.priority ? (
+                          <Badge tone={priorityTone(row.priority)} size="sm">
+                            {priorityLabel(row.priority)}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-text-faint">—</span>
+                        )}
+                      </td>
+                      <td className="max-w-[18rem] px-3 py-2.5 text-sm text-text-dim">
+                        {row.short_reason ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
                         <Badge
                           tone={row.validation_status === "accepted" ? "qualify" : "reject"}
                           size="sm"
+                          variant="outline"
                         >
                           {row.validation_status}
                         </Badge>
@@ -201,8 +257,12 @@ export default function BatchDetailPage() {
                             {row.validation_error}
                           </p>
                         )}
+                        {/* De-emphasized — the priority badge above is the primary read;
+                            this is the raw lead status for anyone who wants it. */}
+                        <p className="t-data mt-1 text-[0.6875rem] text-text-faint">
+                          {row.lead_status ?? ""}
+                        </p>
                       </td>
-                      <td className="t-data px-3 py-2.5 text-text-dim">{row.lead_status ?? "—"}</td>
                       <td className="px-3 py-2.5 text-right">
                         {row.lead_id ? (
                           <Link
@@ -252,6 +312,10 @@ export default function BatchDetailPage() {
       </section>
     </div>
   );
+}
+
+function filterRows(items: BatchRow[], filter: CustomerPriority | "all"): BatchRow[] {
+  return filter === "all" ? items : items.filter((row) => row.priority === filter);
 }
 
 function Th({ children, align = "left" }: { children: React.ReactNode; align?: "left" | "right" }) {
