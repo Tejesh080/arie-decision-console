@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
+import { AskArieAboutLead } from "@/components/lead/AskArieAboutLead";
 import { FeedbackButtons } from "@/components/lead/FeedbackButtons";
 import { ResearchOption } from "@/components/lead/ResearchOption";
 
@@ -194,6 +195,8 @@ export function RecommendationPanel({
       )}
 
       {isPending && <p className="mt-4 text-sm text-text-dim">{recommendation.short_reason}</p>}
+
+      {!isPending && <AskArieAboutLead leadId={leadId} />}
 
       <div className="mt-6 border-t border-border pt-4">
         <FeedbackButtons leadId={leadId} />

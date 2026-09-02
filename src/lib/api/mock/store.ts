@@ -8,6 +8,9 @@ import type {
   BillingResponse,
   CheckoutSessionResponse,
   ConfidenceBand,
+  CopilotIntent,
+  CopilotLeadReference,
+  CopilotResponse,
   CreateICPProfileRequest,
   CreateInvitationRequest,
   CreateOrganizationRequest,
@@ -22,6 +25,7 @@ import type {
   IngestLeadResponse,
   InvitationCreatedResponse,
   InvitationResponse,
+  LeadCopilotResponse,
   LeadExplanationResponse,
   LeadRecommendationResponse,
   LeadResponse,
@@ -1082,6 +1086,153 @@ class MockArieStore {
                   : "borderline",
           }
         : null,
+    };
+  }
+
+  // -------------------------------------------------- M7 Slice 6: mock only --
+  //
+  // Deterministic, keyword-based — the same intent recognizer the backend's
+  // `arie.copilot.recognize_list_intent`/`recognize_lead_intent` apply, kept
+  // narrow rather than reimplementing the LLM classification fallback: mock
+  // mode never calls a model, so an unmatched question always degrades to
+  // the same controlled "couldn't interpret" answer a real budget-exhausted
+  // or unavailable-provider response would.
+
+  askCopilot(question: string): CopilotResponse {
+    const q = question.trim().toLowerCase();
+    const leads = Object.values(this.get().leadsById).map((lead) => ({
+      lead,
+      recommendation: this.getRecommendation(lead.lead_id),
+    }));
+
+    let intent: CopilotIntent | null = null;
+    let matched = leads;
+
+    if (/work on today|what should i (work|do)/.test(q)) {
+      intent = "work_today";
+      const rank: Record<CustomerPriority, number> = {
+        contact_first: 0,
+        worth_pursuing: 1,
+        review: 2,
+        skip: 3,
+      };
+      matched = leads
+        .filter((entry) => entry.recommendation.priority !== "skip")
+        .sort((a, b) => rank[a.recommendation.priority] - rank[b.recommendation.priority]);
+    } else if (/need(s)? (more )?research/.test(q)) {
+      intent = "needs_research";
+      matched = leads.filter((entry) => entry.recommendation.next_action === "research_more");
+    } else if (/decision.?maker/.test(q)) {
+      intent = "missing_decision_maker";
+      matched = leads.filter((entry) => entry.recommendation.next_action === "find_decision_maker");
+    } else if (/low confidence/.test(q)) {
+      intent = "low_confidence";
+      matched = leads.filter((entry) => entry.recommendation.confidence_band === "low");
+    } else if (/feedback|disliked|bad recommendation/.test(q)) {
+      intent = "feedback_summary";
+      matched = leads.filter((entry) => this.feedback.has(entry.lead.lead_id));
+    } else if (/top \d*\s*leads?|best leads?/.test(q)) {
+      intent = "top_leads";
+    }
+
+    if (intent === null) {
+      return {
+        answer:
+          "Ask ARIE can help with your leads, targeting, and recommendations — try asking for " +
+          "your top leads, leads needing research, or what to work on today.",
+        leads: [],
+        intent: "filter_leads",
+        result_count: 0,
+        filters_applied: {},
+        llm_used: false,
+      };
+    }
+
+    const references: CopilotLeadReference[] = matched
+      .slice(0, 20)
+      .map(({ lead, recommendation }) => ({
+        lead_id: lead.lead_id,
+        company: lead.company_name,
+        contact: lead.full_name,
+        priority: recommendation.priority,
+        score: recommendation.score,
+        why: recommendation.short_reason,
+        next_action: recommendation.next_action,
+      }));
+
+    return {
+      answer:
+        references.length > 0
+          ? `Found ${references.length} matching lead${references.length === 1 ? "" : "s"}.`
+          : "No leads matched that question right now.",
+      leads: references,
+      intent,
+      result_count: references.length,
+      filters_applied: {},
+      llm_used: false,
+    };
+  }
+
+  askLeadCopilot(leadId: string, question: string): LeadCopilotResponse {
+    this.requireLead(leadId);
+    const recommendation = this.getRecommendation(leadId);
+    const q = question.trim().toLowerCase();
+
+    if (/missing/.test(q)) {
+      return {
+        lead_id: leadId,
+        intent: "lead_missing_info",
+        answer:
+          recommendation.missing_information.length > 0
+            ? `Still unknown: ${recommendation.missing_information.join(", ")}.`
+            : "Nothing material is missing — ARIE has everything it needs for this recommendation.",
+        missing_information: recommendation.missing_information,
+        researchable_field: null,
+      };
+    }
+    if (/research/.test(q) && /(help|worth|would.*change)/.test(q)) {
+      const plan = this.getResearchPlan(leadId);
+      return {
+        lead_id: leadId,
+        intent: "lead_researchability",
+        answer: plan.approved
+          ? `Yes. ${plan.question ?? "This question"} could materially change this recommendation.`
+          : `No. ${plan.detail}`,
+        missing_information: [],
+        researchable_field: plan.target_field,
+      };
+    }
+    if (/what would (need to )?change|become contact first|improve/.test(q)) {
+      return {
+        lead_id: leadId,
+        intent: "lead_improvement_path",
+        answer:
+          recommendation.missing_information.length > 0
+            ? `Confirming ${recommendation.missing_information[0]} could materially change this ` +
+              "recommendation, though other factors may still affect the final outcome."
+            : "Given everything already known, no additional fact would change this recommendation.",
+        missing_information: recommendation.missing_information,
+        researchable_field: null,
+      };
+    }
+    if (/affect|score driver|drove the score|what.*score/.test(q)) {
+      return {
+        lead_id: leadId,
+        intent: "lead_score_drivers",
+        answer:
+          recommendation.key_evidence.length > 0
+            ? `Positive: ${recommendation.key_evidence.join(", ")}.`
+            : "No scored evidence has been collected for this lead yet.",
+        missing_information: recommendation.missing_information,
+        researchable_field: null,
+      };
+    }
+    return {
+      lead_id: leadId,
+      intent: "lead_explanation",
+      answer: recommendation.short_reason,
+      missing_information: recommendation.missing_information,
+      researchable_field: null,
     };
   }
 

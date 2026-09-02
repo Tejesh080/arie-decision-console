@@ -409,6 +409,65 @@ export interface ResearchExecutionResponse {
   preview: ResearchPreview | null;
 }
 
+// -------------------------------------------------------------- copilot --
+//
+// M7 Slice 6 — "Ask ARIE". `arie.copilot`/`arie.copilot_service` on the
+// backend. Read-only: neither endpoint ever mutates a profile, submits
+// feedback, executes research, or calls a provider.
+
+export type CopilotIntent =
+  | "top_leads"
+  | "filter_leads"
+  | "needs_research"
+  | "missing_decision_maker"
+  | "low_confidence"
+  | "compare_leads"
+  | "feedback_summary"
+  | "work_today"
+  | "lead_explanation"
+  | "lead_missing_info"
+  | "lead_researchability"
+  | "lead_score_drivers"
+  | "lead_improvement_path";
+
+export interface CopilotQueryRequest {
+  question: string;
+}
+
+export interface CopilotLeadReference {
+  lead_id: string;
+  company: string | null;
+  contact: string | null;
+  priority: CustomerPriority;
+  score: number | null;
+  why: string;
+  next_action: NextAction;
+}
+
+/** `POST /copilot/query`'s response. `filters_applied` is Advanced Details
+ * material — render `answer` and `leads`, never parse this to decide what
+ * to show. */
+export interface CopilotResponse {
+  answer: string;
+  leads: CopilotLeadReference[];
+  intent: CopilotIntent;
+  result_count: number;
+  filters_applied: Record<string, unknown>;
+  llm_used: boolean;
+}
+
+export interface LeadCopilotRequest {
+  question: string;
+}
+
+export interface LeadCopilotResponse {
+  lead_id: string;
+  intent: CopilotIntent;
+  answer: string;
+  missing_information: string[];
+  researchable_field: ResearchTargetField | null;
+}
+
 // -------------------------------------------------------------- reviews --
 
 export interface ReviewResponse {

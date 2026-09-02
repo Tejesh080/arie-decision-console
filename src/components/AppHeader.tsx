@@ -27,6 +27,10 @@ const NAV = [
   { href: "/", label: "Overview" },
   { href: "/leads/new", label: "New lead" },
   { href: "/batches", label: "Batches" },
+  // M7 Slice 6 — a plain-English question over the leads/recommendations the
+  // other entries already surface individually. Placed right after the data
+  // itself (batches), ahead of configuration (targeting/ICP/providers).
+  { href: "/ask", label: "Ask ARIE" },
   // Targeting sits ahead of ICP, and is the entry a new customer should find
   // first: it asks two questions in plain English and generates the profile
   // that /icp otherwise expects them to construct by hand. Both remain — a
