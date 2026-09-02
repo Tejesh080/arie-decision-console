@@ -611,4 +611,44 @@ describe("mockStore — Productization M4", () => {
       );
     });
   });
+
+  // -------------------------------------------------------- M7 Slice 5: mock --
+
+  describe("research", () => {
+    it("is decision_already_clear for the autonomous demo identity (all candidate fields known)", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.delacroix@lumen500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const plan = store.getResearchPlan(lead_id);
+      expect(plan.approved).toBe(false);
+      expect(plan.reason_code).toBe("decision_already_clear");
+      expect(plan.target_field).toBeNull();
+    });
+
+    it("is no_research_needed for a lead still mid-pipeline", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({ source: "test", email: "a@b.com" });
+
+      const plan = store.getResearchPlan(lead_id);
+      expect(plan.reason_code).toBe("no_research_needed");
+      expect(plan.approved).toBe(false);
+    });
+
+    it("refuses execution when the plan itself was never approved", () => {
+      const store = freshStore();
+      const { lead_id } = store.createLead({
+        source: "test",
+        email: "nadia.delacroix@lumen500.com",
+      });
+      vi.setSystemTime(T0 + 3000);
+
+      const result = store.executeResearch(lead_id, { target_field: "employee_count" });
+      expect(result.approved).toBe(false);
+      expect(result.cost_usd).toBe("0.0000");
+    });
+  });
 });

@@ -13,6 +13,7 @@ import type {
   CreateOrganizationRequest,
   CreateOrganizationResponse,
   CustomerPriority,
+  ExecuteResearchRequest,
   FeedbackResponse,
   HealthResponse,
   ICPProfile,
@@ -32,6 +33,10 @@ import type {
   ProviderId,
   ProviderStatusResponse,
   ReceiptResponse,
+  ResearchExecutionResponse,
+  ResearchPlanResponse,
+  ResearchReasonCode,
+  ResearchTargetField,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
   ReviewResponse,
@@ -516,6 +521,101 @@ function capitalize(text: string): string {
   return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
 }
 
+// ------------------------------------------------------- M7 Slice 5 mock --
+//
+// Mirrors `arie.research`'s materiality rules closely enough for a demo —
+// see `deriveRecommendation`'s own note above about why this is never
+// imported from a shared module. Both built-in demo identities (and every
+// hashed fallback email, which reuses one of the two templates) already
+// resolve all four Slice-5 candidate fields, so a plan for them always comes
+// back `decision_already_clear` or `field_already_known` — an honest
+// reflection of the fixed demo data, not a bug. See the M7 Slice 5 handoff's
+// "Known limitations" for why this mock never actually persists a new field.
+
+const RESEARCH_FIELD_CEILINGS: Record<ResearchTargetField, number> = {
+  employee_count: 20,
+  industry: 15,
+  title_seniority: 20,
+  title_function: 15,
+};
+
+const RESEARCH_DETERMINISTIC_QUESTIONS: Record<ResearchTargetField, string> = {
+  employee_count: "Approximately how many employees does this company have?",
+  industry: "What industry does this company operate in?",
+  title_seniority: "How senior is this contact within their organization?",
+  title_function: "What functional area does this contact work in?",
+};
+
+function deriveResearchPlan(receipt: ReceiptResponse): ResearchPlanResponse {
+  const refused = (
+    reason_code: ResearchReasonCode,
+    detail: string,
+    decisionAlreadyClear = false,
+  ): ResearchPlanResponse => ({
+    target_field: null,
+    question: null,
+    rationale: null,
+    materiality: null,
+    decision_already_clear: decisionAlreadyClear,
+    candidate_sources: [],
+    estimated_cost_usd: null,
+    reason_code,
+    detail,
+    approved: false,
+    llm_used: false,
+  });
+
+  if (receipt.status !== "decided" || !receipt.score) {
+    return refused("no_research_needed", "ARIE hasn't finished evaluating this lead yet.");
+  }
+  const { value, threshold_qualify, threshold_reject, bounds } = receipt.score;
+  const alreadyClear =
+    bounds.lower >= threshold_qualify ||
+    bounds.upper < threshold_reject ||
+    (bounds.lower >= threshold_reject && bounds.upper < threshold_qualify);
+  if (alreadyClear) {
+    return refused(
+      "decision_already_clear",
+      "Given everything already known, no additional fact could change this recommendation.",
+      true,
+    );
+  }
+
+  const known = new Set(receipt.evidence.items.map((item) => item.field));
+  const candidates = (Object.keys(RESEARCH_FIELD_CEILINGS) as ResearchTargetField[])
+    .filter((field) => !known.has(field))
+    .map((field) => ({ field, ceiling: RESEARCH_FIELD_CEILINGS[field] }))
+    .filter(({ ceiling }) => {
+      const bestCase = value + ceiling;
+      return (
+        (value < threshold_reject && bestCase >= threshold_reject) ||
+        (value < threshold_qualify && bestCase >= threshold_qualify)
+      );
+    })
+    .sort((a, b) => b.ceiling - a.ceiling);
+
+  if (candidates.length === 0) {
+    return refused(
+      "no_useful_question",
+      "No supported field could change this recommendation right now.",
+    );
+  }
+  const target = candidates[0].field;
+  return {
+    target_field: target,
+    question: RESEARCH_DETERMINISTIC_QUESTIONS[target],
+    rationale: "The largest-impact missing field.",
+    materiality: "material",
+    decision_already_clear: false,
+    candidate_sources: ["mock-source"],
+    estimated_cost_usd: "0.0100",
+    reason_code: "research_approved",
+    detail: "Research is available for this lead.",
+    approved: true,
+    llm_used: false,
+  };
+}
+
 const MOCK_USER_ID = "mock-user";
 const MOCK_ORG_ID = "mock-org";
 
@@ -930,6 +1030,59 @@ class MockArieStore {
   getFeedback(leadId: string): FeedbackResponse | null {
     this.requireLead(leadId);
     return this.feedback.get(leadId) ?? null;
+  }
+
+  // -------------------------------------------------- M7 Slice 5: mock only --
+
+  getResearchPlan(leadId: string): ResearchPlanResponse {
+    return deriveResearchPlan(this.getReceipt(leadId));
+  }
+
+  /** Never actually persists a new field — see `deriveResearchPlan`'s own
+   * note on why the two built-in demo identities never produce an approved
+   * plan in the first place. Kept for API-shape completeness and for a
+   * custom identity a future template might make borderline. */
+  executeResearch(leadId: string, request: ExecuteResearchRequest): ResearchExecutionResponse {
+    const plan = this.getResearchPlan(leadId);
+    if (!plan.approved || plan.target_field !== request.target_field) {
+      const reasonCode: ResearchReasonCode = plan.approved
+        ? "missing_field_cannot_change_decision"
+        : plan.reason_code;
+      return {
+        approved: false,
+        reason_code: reasonCode,
+        detail: plan.detail,
+        target_field: request.target_field,
+        provider: null,
+        found_value: null,
+        cost_usd: "0.0000",
+        preview: null,
+      };
+    }
+    const receipt = this.getReceipt(leadId);
+    const score = receipt.score;
+    return {
+      approved: true,
+      reason_code: "research_approved",
+      detail: "New information was found and added to this lead's evidence.",
+      target_field: request.target_field,
+      provider: "mock-source",
+      found_value: null,
+      cost_usd: plan.estimated_cost_usd ?? "0.0000",
+      preview: score
+        ? {
+            score: score.value,
+            bounds_lower: score.bounds.lower,
+            bounds_upper: score.bounds.upper,
+            likely_outcome:
+              score.value >= score.threshold_qualify
+                ? "qualifies"
+                : score.value < score.threshold_reject
+                  ? "rejects"
+                  : "borderline",
+          }
+        : null,
+    };
   }
 
   getReview(reviewId: string): ReviewResponse {

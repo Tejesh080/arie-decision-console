@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
 import { FeedbackButtons } from "@/components/lead/FeedbackButtons";
+import { ResearchOption } from "@/components/lead/ResearchOption";
 
 const PRIORITY_ACCENT = {
   contact_first: "qualify",
@@ -187,6 +188,8 @@ export function RecommendationPanel({
               )}
             </div>
           )}
+
+          {recommendation.missing_information.length > 0 && <ResearchOption leadId={leadId} />}
         </>
       )}
 

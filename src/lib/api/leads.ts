@@ -2,12 +2,16 @@ import { apiClient } from "./client";
 import { getDataMode } from "./mode";
 import { mockStore } from "./mock/store";
 import type {
+  ExecuteResearchRequest,
   FeedbackResponse,
   IngestLeadRequest,
   IngestLeadResponse,
   LeadExplanationResponse,
   LeadRecommendationResponse,
   LeadResponse,
+  ResearchExecutionResponse,
+  ResearchPlanResponse,
+  ResearchTargetField,
   SubmitFeedbackRequest,
 } from "./types";
 
@@ -60,4 +64,31 @@ export async function submitLeadFeedback(
 export async function getLeadFeedback(leadId: string): Promise<FeedbackResponse | null> {
   if (getDataMode() === "mock") return mockStore.getFeedback(leadId);
   return apiClient.get<FeedbackResponse | null>(`/leads/${encodeURIComponent(leadId)}/feedback`);
+}
+
+/** M7 Slice 5. Never spends anything — a proposal only. `approved` is the
+ * one field a "Research this" button may key off of; nothing here is
+ * re-derived client-side. */
+export async function getResearchPlan(leadId: string): Promise<ResearchPlanResponse> {
+  if (getDataMode() === "mock") return mockStore.getResearchPlan(leadId);
+  return apiClient.post<ResearchPlanResponse>(
+    `/leads/${encodeURIComponent(leadId)}/research-plan`,
+    {},
+  );
+}
+
+/** Authorizes and, if approved, performs one simulated research call. The
+ * server recomputes approval from scratch — `targetField` is the only
+ * client-supplied input. */
+export async function executeResearch(
+  leadId: string,
+  targetField: ResearchTargetField,
+): Promise<ResearchExecutionResponse> {
+  const payload: ExecuteResearchRequest = { target_field: targetField };
+  if (getDataMode() === "mock") return mockStore.executeResearch(leadId, payload);
+  return apiClient.post<ResearchExecutionResponse>(
+    `/leads/${encodeURIComponent(leadId)}/research`,
+    payload,
+    { timeoutMs: 20_000 },
+  );
 }

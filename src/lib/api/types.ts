@@ -346,6 +346,69 @@ export interface FeedbackResponse {
   updated_at: string;
 }
 
+// -------------------------------------------------------------- research --
+//
+// M7 Slice 5. `arie.research`/`arie.research_acquisition` on the backend.
+// `ResearchPlanResponse.approved` is the only thing that should ever gate a
+// "Research this" button — the frontend never re-derives that itself.
+
+export type ResearchTargetField =
+  "employee_count" | "industry" | "title_seniority" | "title_function";
+
+export type Materiality = "material" | "non_material" | "already_resolved";
+
+export type ResearchReasonCode =
+  | "no_research_needed"
+  | "decision_already_clear"
+  | "field_already_known"
+  | "missing_field_cannot_change_decision"
+  | "no_supported_source"
+  | "provider_unavailable"
+  | "provider_not_configured"
+  | "over_budget"
+  | "entitlement_blocked"
+  | "suppressed_recent_failure"
+  | "execution_mode_blocked"
+  | "research_approved"
+  | "llm_unavailable"
+  | "no_useful_question";
+
+export interface ResearchPlanResponse {
+  target_field: ResearchTargetField | null;
+  question: string | null;
+  rationale: string | null;
+  materiality: Materiality | null;
+  decision_already_clear: boolean;
+  candidate_sources: string[];
+  estimated_cost_usd: string | null;
+  reason_code: ResearchReasonCode;
+  detail: string;
+  approved: boolean;
+  llm_used: boolean;
+}
+
+export interface ExecuteResearchRequest {
+  target_field: ResearchTargetField;
+}
+
+export interface ResearchPreview {
+  score: number;
+  bounds_lower: number;
+  bounds_upper: number;
+  likely_outcome: "qualifies" | "borderline" | "rejects";
+}
+
+export interface ResearchExecutionResponse {
+  approved: boolean;
+  reason_code: ResearchReasonCode;
+  detail: string;
+  target_field: ResearchTargetField | null;
+  provider: string | null;
+  found_value: unknown;
+  cost_usd: string;
+  preview: ResearchPreview | null;
+}
+
 // -------------------------------------------------------------- reviews --
 
 export interface ReviewResponse {
