@@ -42,10 +42,16 @@ export async function proxyToArie(
   backendPath: string,
   init: { method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown },
   auth?: ArieAuthHeaders,
+  /** Overrides `PROXY_TIMEOUT_MS` — for the one route (discovery run
+   * creation) whose backend call is a bounded but genuinely slow synchronous
+   * pipeline, not a plain read or write. Stay comfortably below the route's
+   * own exported `maxDuration`, same rule the module docstring states for
+   * the default. */
+  timeoutMs: number = PROXY_TIMEOUT_MS,
 ): Promise<NextResponse> {
   const url = `${backendBaseUrl()}${backendPath}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers["Content-Type"] = "application/json";

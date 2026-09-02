@@ -25,6 +25,12 @@ import { SignOutButton } from "./SignOutButton";
  */
 const NAV = [
   { href: "/", label: "Overview" },
+  // Product Pivot — the primary surface: "tell me what you sell and I will
+  // find the opportunities worth your attention." Placed first, ahead of
+  // the CSV-first workflow it demotes but doesn't remove — "New lead" and
+  // "Batches" stay reachable for anyone who still wants to bring their own
+  // list.
+  { href: "/discover", label: "Find customers" },
   { href: "/leads/new", label: "New lead" },
   { href: "/batches", label: "Batches" },
   // M7 Slice 6 — a plain-English question over the leads/recommendations the

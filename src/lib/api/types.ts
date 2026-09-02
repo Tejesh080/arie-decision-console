@@ -1173,3 +1173,96 @@ export interface DashboardSummary {
   open_proposals: RevisionProposal[];
   feedback: DashboardFeedback;
 }
+
+// -------------------------------------------------------------- discovery --
+//
+// Product Pivot. "Tell me what you sell and I will find the opportunities
+// worth your attention." Mirrors `arie.api.schemas`'s discovery response
+// models field for field. `Opportunity` deliberately shares its
+// priority/next_action/score/confidence/short_reason/key_evidence/
+// missing_information shape with `LeadRecommendationResponse` — it *is* one,
+// projected through the same `arie.recommendations` machinery, plus
+// discovery-specific provenance and a buyer signal.
+
+export type DiscoveryRunStatus =
+  | "draft"
+  | "planning"
+  | "discovering"
+  | "screening"
+  | "promoting"
+  | "researching"
+  | "complete"
+  | "failed"
+  | "cancelled";
+
+export interface StartDiscoveryRunRequest {
+  requested_opportunity_count?: number;
+  market?: string | null;
+  max_candidates?: number;
+}
+
+export interface DiscoveryFunnel {
+  search_queries: number;
+  raw_candidates: number;
+  unique_companies: number;
+  screened: number;
+  promising: number;
+  possible: number;
+  unlikely: number;
+  insufficient_info: number;
+  promoted_to_leads: number;
+  research_candidates: number;
+  research_calls: number;
+  buyer_lookups: number;
+  final_opportunities: number;
+  llm_calls: number;
+  llm_cost_usd: string;
+  provider_calls: number;
+  provider_cost_usd: string;
+}
+
+export interface DiscoveryRun {
+  run_id: string;
+  status: DiscoveryRunStatus;
+  requested_opportunity_count: number;
+  market: string | null;
+  max_candidates: number;
+  profile_version: number | null;
+  error_detail: string | null;
+  funnel: DiscoveryFunnel;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface BuyerSignal {
+  seniority: string | null;
+  function: string | null;
+  name_known: boolean;
+  source: string | null;
+  confidence: number | null;
+}
+
+export interface Opportunity {
+  candidate_id: string;
+  lead_id: string;
+  company_name: string;
+  domain: string;
+  priority: CustomerPriority;
+  next_action: NextAction;
+  score: number | null;
+  confidence: number | null;
+  short_reason: string;
+  key_evidence: string[];
+  missing_information: string[];
+  buyer: BuyerSignal | null;
+  research_performed: boolean;
+  discovery_source: string;
+  source_url: string;
+  search_query: string;
+}
+
+export interface DiscoveryRunWithOpportunities {
+  run: DiscoveryRun;
+  opportunities: Opportunity[];
+}
