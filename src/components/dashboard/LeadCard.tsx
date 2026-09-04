@@ -10,6 +10,7 @@ import { costNounShort } from "@/lib/api/providerMode";
 import { Badge } from "@/components/ui/Badge";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { riseIn, riseInStill } from "@/lib/motion";
+import { pointerGlowLeave, pointerGlowMove } from "@/lib/pointerGlow";
 
 /**
  * One locally-remembered lead.
@@ -35,7 +36,9 @@ export function LeadCard({
     <motion.li variants={reduced ? riseInStill : riseIn} className="min-w-0">
       <Link
         href={`/leads/${entry.lead_id}`}
-        className="group surface-flat relative flex h-full min-w-0 flex-col p-4 transition-[border-color,background-color,transform] duration-[180ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:border-border-loud hover:bg-surface-2"
+        onPointerMove={pointerGlowMove}
+        onPointerLeave={pointerGlowLeave}
+        className="liquid-surface liquid-edge group relative flex h-full min-w-0 flex-col rounded-xl p-4 transition-transform duration-[180ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

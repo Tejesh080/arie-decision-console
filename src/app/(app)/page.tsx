@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { ArrowRight, MonitorSmartphone, Search } from "lucide-react";
 import { getDataMode } from "@/lib/api/mode";
 import { getLead } from "@/lib/api/leads";
@@ -10,20 +10,38 @@ import { getRecentLeads, type RecentLeadEntry } from "@/lib/localHistory";
 import type { LeadResponse } from "@/lib/api/types";
 import { formatUsdCompact, parseUsd } from "@/lib/format";
 import { costNounShort, costCaveat } from "@/lib/api/providerMode";
-import { Panel, Eyebrow } from "@/components/ui/Panel";
+import { Eyebrow } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Mark } from "@/components/brand/Mark";
-import { DecisionField } from "@/components/graphics/DecisionField";
+import { HeroAurora } from "@/components/graphics/HeroAurora";
+import { ProductFrame } from "@/components/graphics/ProductFrame";
+import { AnimatedGridPattern } from "@/components/graphics/AnimatedGridPattern";
+import { FunnelStory } from "@/components/marketing/FunnelStory";
 import { LeadCard } from "@/components/dashboard/LeadCard";
 import { DemoCards, DemoSteps } from "@/components/dashboard/DemoCards";
 import { CustomerDashboard } from "@/components/dashboard/CustomerDashboard";
-import { riseIn, riseInStill, stagger } from "@/lib/motion";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { REVEAL_VIEWPORT, arrival, entrance, stagger } from "@/lib/motion";
 
-export default function DashboardPage() {
+export default function OverviewPage() {
   const mode = getDataMode();
   const router = useRouter();
   const reduced = useReducedMotion();
+
+  // The hero settles back and dims as the next section arrives, so the page
+  // reads as one camera move rather than two stacked screens.
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  // Neutralised by output range rather than by dropping the `style` prop:
+  // the prop's presence must not depend on `reduced`, or the server (where
+  // `useReducedMotion()` is always false) and the client render different
+  // markup. Both start at 1, so the SSR'd HTML is identical either way.
+  const heroOpacity = useTransform(heroProgress, [0, 1], reduced ? [1, 1] : [1, 0.25]);
+  const heroScale = useTransform(heroProgress, [0, 1], reduced ? [1, 1] : [1, 0.96]);
 
   const [recent, setRecent] = useState<RecentLeadEntry[]>([]);
   const [leads, setLeads] = useState<Record<string, LeadResponse>>({});
@@ -80,121 +98,231 @@ export default function DashboardPage() {
     if (id) router.push(`/leads/${id}`);
   }
 
-  const variants = reduced ? riseInStill : riseIn;
+  const variants = entrance(reduced);
+  const arrive = arrival(reduced);
 
   return (
-    <div className="mx-auto max-w-[1200px] px-5 sm:px-8">
-      {/* M7 Slice 7, Part H — a real customer's own operational dashboard.
-          Renders only in "api" mode; the marketing/demo content below is
-          unchanged and still what a signed-out or mock-mode visitor sees. */}
+    <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+      {/* A real customer's own operational dashboard. Renders only in "api"
+          mode; everything below is what a signed-out or mock-mode visitor
+          sees. */}
       {mode === "api" && <CustomerDashboard />}
 
       {/* ------------------------------------------------------------ hero */}
       <motion.section
-        variants={stagger(0.07)}
+        ref={heroRef}
+        variants={stagger(0.075)}
         initial="hidden"
         animate="show"
-        className="grid items-center gap-10 py-14 sm:py-18 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] lg:gap-14"
+        style={{ opacity: heroOpacity, scale: heroScale }}
+        className="relative flex flex-col items-center pt-20 pb-20 text-center sm:pt-28 sm:pb-28"
       >
-        <div className="max-w-[40rem]">
-          <motion.div variants={variants}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface/70 py-1 pr-3 pl-1.5 backdrop-blur-sm">
-              <Mark className="h-4 w-4 text-text-dim" />
-              <span className="t-label text-text-dim">Adaptive Revenue Intelligence Engine</span>
+        <HeroAurora />
+
+        <motion.div variants={variants}>
+          <span className="liquid-surface liquid-edge inline-flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-2">
+            <Mark className="h-4 w-4 text-qualify" />
+            <span className="t-sys text-text-dim">Signal Intelligence</span>
+          </span>
+        </motion.div>
+
+        <motion.h1
+          variants={arrive}
+          className="t-editorial mt-8 max-w-[52rem] text-[clamp(2.6rem,1.3rem+4.6vw,4.75rem)] leading-[1.04] text-balance text-text"
+        >
+          Most of the market is <span className="t-noise">noise.</span> ARIE finds the{" "}
+          <span className="signal-word align-baseline">
+            <span aria-hidden className="signal-word__halo">
+              signal.
             </span>
-          </motion.div>
+            <span aria-hidden className="signal-word__core">
+              signal.
+            </span>
+            <span aria-hidden className="signal-word__stroke">
+              signal.
+            </span>
+            <span className="sr-only">signal.</span>
+          </span>
+        </motion.h1>
 
-          {/* The value has to land before anyone reads a second sentence. */}
-          <motion.h1 variants={variants} className="t-display mt-6 text-balance text-text">
-            Stop paying for lead data once you already know enough to decide.
-          </motion.h1>
+        <motion.p variants={variants} className="t-lead mt-7 max-w-[34rem] text-pretty">
+          Tell it what you sell. ARIE watches the market for the moment a company has a real
+          reason to care, verifies what it finds on their own site, and names the person who owns
+          the problem — evidence attached.
+        </motion.p>
 
-          <motion.p
-            variants={variants}
-            className="mt-6 text-[1.0625rem] leading-relaxed text-text-dim"
-          >
-            ARIE buys enrichment one provider at a time, checks how confident it is after each one,
-            and stops as soon as more data could not change the answer — then routes the lead,
-            rejects it, or hands it to a person.
+        {/* No Motion wrapper around these: `whileHover` makes Motion add
+            `tabindex="0"` to the wrapper, which both mismatches on
+            hydration (the prop is reduced-motion dependent, and
+            `useReducedMotion()` is false on the server) and gives every CTA
+            a second, useless tab stop in front of the real link. The
+            buttons carry their own press, lift and sheen in CSS. */}
+        <motion.div variants={variants} className="mt-9 flex flex-wrap items-center justify-center gap-3.5">
+          <ButtonLink href="/discover" variant="primary" size="lg">
+            Find customers
+            <ArrowRight
+              className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-0.5"
+              strokeWidth={2.5}
+            />
+          </ButtonLink>
+          <ButtonLink href="/leads/new?run=autonomous" variant="secondary" size="lg">
+            Watch a run
+          </ButtonLink>
+        </motion.div>
+
+        {mode === "mock" && (
+          <motion.p variants={variants} className="mt-5 text-[0.8125rem] text-text-faint">
+            You&apos;re in demo mode — everything works, nothing is billed.
           </motion.p>
+        )}
 
-          <motion.div variants={variants} className="mt-8 flex flex-wrap items-center gap-3">
-            <ButtonLink href="/leads/new?run=autonomous" variant="primary" size="lg">
-              Run the demo
-              <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
-            </ButtonLink>
-            <ButtonLink href="/leads/new" variant="secondary" size="lg">
-              Evaluate your own lead
-            </ButtonLink>
-            {mode === "mock" && <Badge tone="human">Mock mode — no backend required</Badge>}
-          </motion.div>
-        </div>
-
-        <motion.div variants={variants} className="relative -mx-2 lg:mx-0">
-          <DecisionField />
+        <motion.div variants={arrive} className="mt-16 w-full sm:mt-20">
+          <ProductFrame />
         </motion.div>
       </motion.section>
 
-      {/* --------------------------------------------------------- try it */}
-      <section className="border-t border-border py-14">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div className="min-w-0">
-            <h2 className="t-h2 text-text">See it decide</h2>
-            <p className="mt-1.5 max-w-xl text-sm text-text-dim">
-              Three prepared leads, one for each outcome ARIE can reach. Each runs against the live
-              backend and ends on a Decision Receipt.
+      {/* --------------------------------------------------- how it works */}
+      <section className="relative border-t border-white/[0.05] py-24 sm:py-32">
+        {/* A second, much quieter pass of the hero's grid pattern — the
+            page's own rhythm re-asserting itself rather than a one-off
+            hero effect. Half the opacity, no colour glow behind it. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[320px]"
+          style={{
+            maskImage: "radial-gradient(55% 90% at 78% 10%, black, transparent 75%)",
+            WebkitMaskImage: "radial-gradient(55% 90% at 78% 10%, black, transparent 75%)",
+          }}
+        >
+          <AnimatedGridPattern width={34} height={34} numSquares={18} maxOpacity={0.14} duration={5.5} />
+        </div>
+
+        <motion.div
+          variants={variants}
+          initial="hidden"
+          whileInView="show"
+          viewport={REVEAL_VIEWPORT}
+          className="max-w-2xl"
+        >
+          <Eyebrow>How it gets there</Eyebrow>
+          <h2 className="t-h2 mt-3 text-balance text-text">
+            Four steps, and it stops as soon as the answer can&apos;t change.
+          </h2>
+          <p className="mt-4 text-[1.0313rem] leading-relaxed text-text-dim">
+            Most of the market never costs you anything. ARIE only spends real research on the
+            companies that survive its own screen — and shows you the reasoning either way.
+          </p>
+        </motion.div>
+
+        <FunnelStory />
+      </section>
+
+      {/* -------------------------------------------------------- see it run */}
+      <section className="border-t border-white/[0.05] py-24 sm:py-32">
+        <motion.div
+          variants={variants}
+          initial="hidden"
+          whileInView="show"
+          viewport={REVEAL_VIEWPORT}
+          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5"
+        >
+          <div className="max-w-xl">
+            <Eyebrow>See it run</Eyebrow>
+            <h2 className="t-h2 mt-3 text-balance text-text">Three outcomes, live.</h2>
+            <p className="mt-4 text-[1.0313rem] leading-relaxed text-text-dim">
+              Each example runs against the real backend and ends on the full reasoning — including
+              the one where ARIE decides it shouldn&apos;t act alone.
             </p>
           </div>
           <DemoSteps />
-        </div>
+        </motion.div>
 
-        <div className="mt-6">
+        <div className="mt-12">
           <DemoCards />
         </div>
       </section>
 
+      {/* ------------------------------------------------------- pull quote */}
+      <section className="relative overflow-hidden border-t border-white/[0.05] py-28 text-center sm:py-36">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 opacity-70"
+          style={{
+            background:
+              "radial-gradient(560px 320px at 50% 40%, rgba(79,227,193,0.14), transparent 70%)",
+          }}
+        />
+        <motion.p
+          variants={arrival(reduced)}
+          initial="hidden"
+          whileInView="show"
+          viewport={REVEAL_VIEWPORT}
+          className="t-editorial mx-auto max-w-[46rem] text-[clamp(1.9rem,1.1rem+2.6vw,3.4rem)] leading-[1.12] text-balance text-text"
+        >
+          Most tools tell you who might buy. ARIE tells you who&apos;s{" "}
+          <span className="signal-word align-baseline">
+            <span aria-hidden className="signal-word__halo">
+              ready.
+            </span>
+            <span aria-hidden className="signal-word__core">
+              ready.
+            </span>
+            <span aria-hidden className="signal-word__stroke">
+              ready.
+            </span>
+            <span className="sr-only">ready.</span>
+          </span>
+        </motion.p>
+      </section>
+
       {/* -------------------------------------------------- local activity */}
-      <section className="pb-24">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="t-h2 text-text">Recent demo activity</h2>
+      <section className="border-t border-white/[0.05] py-24 sm:py-28">
+        <motion.div
+          variants={variants}
+          initial="hidden"
+          whileInView="show"
+          viewport={REVEAL_VIEWPORT}
+          className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5"
+        >
+          <div className="max-w-xl">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Eyebrow>Your recent runs</Eyebrow>
               <Badge tone="neutral" size="sm">
                 <MonitorSmartphone aria-hidden className="h-3 w-3" strokeWidth={2} />
-                Stored on this browser
+                This browser
               </Badge>
             </div>
-            <p className="mt-1.5 max-w-xl text-sm text-text-faint">
-              Just the leads <em>you</em> ran, remembered by this browser so you can find your way
-              back to a receipt. It isn&apos;t ARIE&apos;s dataset — other people&apos;s leads never
-              appear here, and an empty list doesn&apos;t mean an empty system. Each card&apos;s
-              status is fetched live.
+            <h2 className="t-h2 mt-3 text-text">Pick up where you left off.</h2>
+            <p className="mt-3 text-[0.9375rem] leading-relaxed text-text-faint">
+              Only the runs <em>you</em> started, remembered locally so you can find your way back.
+              Other people&apos;s work never appears here, and an empty list doesn&apos;t mean an
+              empty system.
             </p>
           </div>
 
-          <form onSubmit={handleLookup} className="flex w-full items-center gap-2 sm:w-auto">
+          <form onSubmit={handleLookup} className="flex w-full items-center gap-2.5 sm:w-auto">
             <label htmlFor="lead-lookup" className="sr-only">
               Look up a lead by ID
             </label>
             <div className="relative flex-1 sm:w-72 sm:flex-none">
               <Search
                 aria-hidden
-                className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-text-faint"
+                className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-text-faint"
                 strokeWidth={2}
               />
               <input
                 id="lead-lookup"
                 value={lookupId}
                 onChange={(e) => setLookupId(e.target.value)}
-                placeholder="Look up any lead ID…"
-                className="input t-data pl-9"
+                placeholder="Open a lead by ID…"
+                className="input t-data pl-10"
               />
             </div>
             <Button type="submit" disabled={!lookupId.trim()}>
               Open
             </Button>
           </form>
-        </div>
+        </motion.div>
 
         {scope.tracked > 0 && (
           <ScopeStrip
@@ -210,10 +338,10 @@ export default function DashboardPage() {
           <EmptyState />
         ) : (
           <motion.ul
-            variants={stagger(0.045)}
+            variants={stagger(0.05)}
             initial="hidden"
             animate="show"
-            className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+            className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           >
             {recent.map((entry) => (
               <LeadCard
@@ -230,8 +358,8 @@ export default function DashboardPage() {
   );
 }
 
-/** Counts across the locally-tracked set. Scoped in the label, not just in a
- * footnote — a number without its denominator is how dashboards start
+/** Counts across the locally-tracked set. Scoped in the label, not just in
+ * a footnote — a number without its denominator is how dashboards start
  * lying. */
 function ScopeStrip({
   tracked,
@@ -247,63 +375,90 @@ function ScopeStrip({
   cost: number;
 }) {
   const items = [
-    { label: "Tracked here", value: String(tracked), tone: "text-text" },
+    { label: "Runs here", raw: tracked, format: undefined, tone: "text-text" },
     {
-      label: "Awaiting review",
-      value: String(awaiting),
+      label: "Waiting on you",
+      raw: awaiting,
+      format: undefined,
       tone: awaiting > 0 ? "text-human" : "text-text",
     },
     {
-      label: "Shadow evaluated",
-      value: String(shadow),
+      label: "Watched only",
+      raw: shadow,
+      format: undefined,
       tone: shadow > 0 ? "text-shadow-role" : "text-text",
     },
-    { label: costNounShort(), value: formatUsdCompact(cost), tone: "text-text" },
+    { label: costNounShort(), raw: cost, format: formatUsdCompact, tone: "text-text" },
   ];
 
   return (
-    <div className="surface-flat mt-6 grid grid-cols-2 divide-border sm:grid-cols-4 sm:divide-x">
-      {items.map((item, i) => (
-        <div
-          key={item.label}
-          className={i < 2 ? "border-b border-border p-4 sm:border-b-0" : "p-4"}
-        >
-          <Eyebrow>{item.label}</Eyebrow>
-          <p className={`t-metric mt-2 text-2xl ${item.tone}`}>{item.value}</p>
-        </div>
-      ))}
-      <p className="col-span-2 border-t border-border px-4 py-2.5 text-[0.6875rem] leading-relaxed text-text-faint sm:col-span-4">
-        Across {resolved} of {tracked} leads this browser could reach. {costCaveat()}
+    <div className="liquid-surface liquid-edge mt-10 overflow-hidden rounded-2xl">
+      <div className="grid grid-cols-2 sm:grid-cols-4">
+        {items.map((item, i) => (
+          <div
+            key={item.label}
+            className={clsxCell(i)}
+          >
+            <Eyebrow>{item.label}</Eyebrow>
+            <p className={`t-metric mt-3.5 text-[2.25rem] sm:text-[2.5rem] ${item.tone}`}>
+              <AnimatedNumber value={item.raw} format={item.format} />
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="border-t border-white/[0.05] px-5 py-3 text-[0.75rem] leading-relaxed text-text-faint">
+        Across {resolved} of {tracked} runs this browser could reach. {costCaveat()}
       </p>
     </div>
   );
 }
 
+/** Hairlines only between cells, and only where they don't box a cell in. */
+function clsxCell(i: number) {
+  const base = "p-6 sm:p-8";
+  const rowBorder = i < 2 ? " border-b border-white/[0.05] sm:border-b-0" : "";
+  const colBorder = i % 2 === 1 ? " border-l border-white/[0.05]" : "";
+  const smColBorder = i > 0 ? " sm:border-l sm:border-white/[0.05]" : "";
+  return base + rowBorder + colBorder + smColBorder;
+}
+
 function EmptyState() {
   return (
-    <Panel className="mt-6" padding="lg">
-      <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
-        <div className="max-w-md">
-          <Eyebrow>No local history</Eyebrow>
-          <h3 className="t-h3 mt-2 text-text">You haven&apos;t run anything yet.</h3>
-          <p className="mt-2 text-sm leading-relaxed text-text-dim">
-            Run one of the three examples above and it will appear here, so you can get back to its
-            receipt later. Already have a lead ID? Paste it into the lookup.
+    <div className="liquid-surface liquid-edge mt-10 overflow-hidden rounded-2xl">
+      <div className="relative flex flex-col items-start gap-8 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
+        <div className="max-w-lg">
+          <h3 className="t-h3 text-text">Nothing on this browser yet.</h3>
+          <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-text-dim">
+            Start with a market search, or run one of the three examples above. Whatever you run
+            shows up here so you can get back to it later.
           </p>
-          <div className="mt-5">
-            <ButtonLink href="/leads/new?run=autonomous" variant="primary">
-              Run a demo lead
-              <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+          <div className="mt-6 flex flex-wrap gap-3">
+            <ButtonLink href="/discover" variant="primary">
+              Find customers
+              <ArrowRight
+                className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-0.5"
+                strokeWidth={2.5}
+              />
+            </ButtonLink>
+            <ButtonLink href="/leads/new?run=autonomous" variant="ghost">
+              Run an example
             </ButtonLink>
           </div>
         </div>
         <div
           aria-hidden
-          className="hidden shrink-0 items-center justify-center rounded-xl border border-border bg-bg-sunken p-8 sm:flex"
+          className="relative hidden h-28 w-28 shrink-0 items-center justify-center sm:flex"
         >
-          <Mark className="h-16 w-16 text-text-faint" crossed={false} />
+          <span
+            className="absolute inset-0 rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(79,227,193,0.10), transparent 68%)",
+            }}
+          />
+          <Mark className="h-14 w-14 text-text-faint" live={false} />
         </div>
       </div>
-    </Panel>
+    </div>
   );
 }

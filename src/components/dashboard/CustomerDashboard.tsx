@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, Upload } from "lucide-react";
 import { getDashboard } from "@/lib/api/dashboard";
 import type { DashboardSummary } from "@/lib/api/types";
@@ -11,12 +12,15 @@ import { Panel, Eyebrow, PanelHeader } from "@/components/ui/Panel";
 import { Badge } from "@/components/ui/Badge";
 import { ButtonLink } from "@/components/ui/Button";
 import { Stat } from "@/components/ui/Stat";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { entrance, stagger } from "@/lib/motion";
 
 /**
  * "When I log in, what should I do?" — M7 Slice 7, Part H. One bounded
  * `GET /dashboard` call, no per-card fetch, no LLM anywhere on this page.
  */
 export function CustomerDashboard() {
+  const reduced = useReducedMotion();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,36 +61,59 @@ export function CustomerDashboard() {
   }
 
   const counts = summary.priority_counts;
+  const variants = entrance(reduced);
 
   return (
-    <section className="py-10">
-      <Eyebrow>Dashboard</Eyebrow>
-      <h1 className="t-h1 mt-1.5 text-text">What should I work on?</h1>
+    <motion.section
+      variants={stagger(0.06)}
+      initial="hidden"
+      animate="show"
+      className="py-10"
+    >
+      <motion.div variants={variants}>
+        <Eyebrow>Dashboard</Eyebrow>
+        <h1 className="t-h1 mt-1.5 text-text">What should I work on?</h1>
+      </motion.div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Panel padding="sm" accent="qualify">
-          <Stat
-            label={priorityLabel("contact_first")}
-            value={counts.contact_first}
-            tone="qualify"
-          />
-        </Panel>
-        <Panel padding="sm" accent="machine">
-          <Stat
-            label={priorityLabel("worth_pursuing")}
-            value={counts.worth_pursuing}
-            tone="machine"
-          />
-        </Panel>
-        <Panel padding="sm" accent="human">
-          <Stat label={priorityLabel("review")} value={counts.review} tone="human" />
-        </Panel>
-        <Panel padding="sm">
-          <Stat label={priorityLabel("skip")} value={counts.skip} />
-        </Panel>
-      </div>
+      <motion.div
+        variants={stagger(0.05)}
+        className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <motion.div variants={variants}>
+          <Panel padding="sm" accent="qualify">
+            <Stat
+              label={priorityLabel("contact_first")}
+              value={<AnimatedNumber value={counts.contact_first} />}
+              tone="qualify"
+            />
+          </Panel>
+        </motion.div>
+        <motion.div variants={variants}>
+          <Panel padding="sm" accent="machine">
+            <Stat
+              label={priorityLabel("worth_pursuing")}
+              value={<AnimatedNumber value={counts.worth_pursuing} />}
+              tone="machine"
+            />
+          </Panel>
+        </motion.div>
+        <motion.div variants={variants}>
+          <Panel padding="sm" accent="human">
+            <Stat
+              label={priorityLabel("review")}
+              value={<AnimatedNumber value={counts.review} />}
+              tone="human"
+            />
+          </Panel>
+        </motion.div>
+        <motion.div variants={variants}>
+          <Panel padding="sm">
+            <Stat label={priorityLabel("skip")} value={<AnimatedNumber value={counts.skip} />} />
+          </Panel>
+        </motion.div>
+      </motion.div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <motion.div variants={variants} className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Panel padding="lg">
           <PanelHeader eyebrow="Priority today" title="Start with these leads" />
           {summary.top_leads.length > 0 ? (
@@ -182,7 +209,7 @@ export function CustomerDashboard() {
             </Panel>
           )}
         </div>
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
   );
 }

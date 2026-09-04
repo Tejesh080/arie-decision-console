@@ -45,13 +45,16 @@ export function DemoModeChip({ className }: { className?: string }) {
         )}
       >
         <FlaskConical aria-hidden className="h-3 w-3 shrink-0 text-text-dim" strokeWidth={2} />
-        {/* Below `sm` the header has no room for this and the nav, and the nav
-            wins. The icon alone still marks the page, and the tooltip still
-            opens on tap. */}
-        <span className="t-label hidden text-text-dim sm:inline">Demo mode</span>
-        <span className="t-label hidden text-text-faint lg:inline">
-          · simulated providers · modelled cost
-        </span>
+        {/* Below `sm` the header has no room for this and the nav, and the
+            nav wins. The icon alone still marks the page, and the tooltip
+            still opens on tap.
+
+            The chip deliberately says only "Demo mode": the full statement
+            of what is and isn't simulated lives in the tooltip. Spelling
+            "simulated providers · modelled cost" across the header put the
+            most engineering-shaped sentence in the product in the most
+            prominent chrome on every screen. */}
+        <span className="hidden text-[0.75rem] font-medium text-text-dim sm:inline">Demo mode</span>
         <span className="sr-only">Demo mode — simulated provider acquisition, modelled costs</span>
       </span>
     </Tooltip>

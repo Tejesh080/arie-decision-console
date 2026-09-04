@@ -22,7 +22,7 @@ export function NoOrganizationAccess() {
     >
       <Panel padding="lg" className="w-full max-w-md text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-bg-sunken">
-          <Mark className="h-6 w-6 text-text-faint" crossed={false} />
+          <Mark className="h-6 w-6 text-text-faint" live={false} />
         </div>
         <Eyebrow className="mt-5">No organization access</Eyebrow>
         <h1 className="t-h3 mt-2 text-text">

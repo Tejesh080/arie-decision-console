@@ -1,14 +1,23 @@
+import clsx from "clsx";
+
 /**
- * The ARIE mark: a threshold glyph.
+ * The ARIE mark: convergence.
  *
- * A track of accumulating evidence runs left to right, meets the autonomy
- * threshold (the vertical bar), and one marker has crossed it. That is
- * literally the product's whole thesis — keep gathering, or has enough
- * been gathered to act? — reduced to four strokes.
+ * Two evidence paths arrive from the left and resolve into a single lit
+ * point — many weak signals about a market becoming one thing worth acting
+ * on. That is the whole product in four strokes.
  *
- * Deliberately not a brain, a robot, or a sparkle.
+ * Deliberately not a brain, a robot, a sparkle, or a node graph.
  */
-export function Mark({ className, crossed = true }: { className?: string; crossed?: boolean }) {
+export function Mark({
+  className,
+  live = true,
+}: {
+  className?: string;
+  /** `false` dims the resolved point — used where nothing has resolved yet
+   * (empty states), so the mark tells the truth about the screen. */
+  live?: boolean;
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -18,32 +27,54 @@ export function Mark({ className, crossed = true }: { className?: string; crosse
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {/* Evidence track */}
-      <path d="M3 12h11" stroke="currentColor" strokeWidth="1.75" opacity="0.4" />
-      {/* Autonomy threshold */}
-      <path d="M15 4.5v15" stroke="currentColor" strokeWidth="1.75" opacity="0.75" />
-      {/* The marker, past the threshold when the decision cleared it */}
-      <circle
-        cx={crossed ? 19.5 : 10}
-        cy="12"
-        r="2.5"
-        fill="currentColor"
-        className="text-machine"
+      {/* Evidence paths converging */}
+      <path
+        d="M2.5 6.5C7.5 6.5 9.5 11 13 12"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        opacity="0.45"
       />
+      <path
+        d="M2.5 17.5C7.5 17.5 9.5 13 13 12"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        opacity="0.45"
+      />
+      {/* The resolved signal */}
+      <circle
+        cx="17.5"
+        cy="12"
+        r="4.6"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        opacity={live ? 0.32 : 0.16}
+      />
+      <circle cx="17.5" cy="12" r="2.4" className={live ? "fill-qualify" : "fill-text-faint"} />
     </svg>
   );
 }
 
-/** Full lockup for the header: mark + wordmark + product descriptor. */
-export function Wordmark({ className }: { className?: string }) {
+/**
+ * Full lockup for the header. The descriptor names what ARIE does now —
+ * watching signals — rather than the enrichment mechanism it was built on.
+ */
+export function Wordmark({
+  className,
+  descriptor = true,
+}: {
+  className?: string;
+  descriptor?: boolean;
+}) {
   return (
-    <span className={className}>
-      <span className="flex items-center gap-2.5">
-        <Mark className="h-[22px] w-[22px] text-text" />
-        <span className="flex items-baseline gap-2">
-          <span className="text-[0.9375rem] font-semibold tracking-[-0.02em] text-text">ARIE</span>
-          <span className="t-label hidden text-text-faint sm:inline">Decision Console</span>
-        </span>
+    <span className={clsx("flex items-center gap-2.5", className)}>
+      <Mark className="h-[21px] w-[21px] text-text" />
+      <span className="flex items-baseline gap-2">
+        <span className="text-[0.9375rem] font-semibold tracking-[-0.03em] text-text">ARIE</span>
+        {descriptor && (
+          <span className="hidden text-[0.6875rem] font-medium tracking-[0.06em] text-text-faint sm:inline">
+            Signal Intelligence
+          </span>
+        )}
       </span>
     </span>
   );

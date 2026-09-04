@@ -1,15 +1,24 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { AmbientField } from "@/components/graphics/AmbientField";
 import "./globals.css";
 
 /**
- * One type family in two voices. Geist for interface text and display,
- * Geist Mono for every figure, identifier and threshold — the "data voice".
- * A single family keeps the vertical rhythm consistent between a label and
- * the number under it, which a sans/mono pairing from two foundries never
- * quite manages.
+ * Three voices, not one. Fraunces carries the editorial hero moments — it
+ * has a real optical-size axis, so it gets sharper and more characterful as
+ * it gets larger instead of just scaling up a body font. Geist stays the
+ * interface voice (legible at UI sizes, never decorative). Geist Mono is the
+ * system/signal voice: figures, identifiers, timestamps, evidence — used
+ * sparingly, never as the default.
  */
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  axes: ["opsz", "SOFT", "WONK"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
 const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
@@ -35,7 +44,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} ${geistMono.variable} h-full`}>
+    <html
+      lang="en"
+      className={`${geist.variable} ${geistMono.variable} ${fraunces.variable} h-full`}
+    >
       <body className="relative flex min-h-full flex-col">
         <AmbientField />
         {children}

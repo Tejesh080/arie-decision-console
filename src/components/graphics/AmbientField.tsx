@@ -1,45 +1,71 @@
 /**
- * The page's light. Two fixed, pointer-transparent layers:
+ * The page's light.
  *
- *   1. A cold radial pool behind the top of the page, so content near the
- *      header sits in light and the page bottom falls away into graphite.
- *   2. A single raking sweep across the upper third — one directional light
- *      source, the thing that separates "considered dark UI" from "black
- *      rectangle".
+ * Four fixed, pointer-transparent layers that together make the background
+ * read as a lit space rather than a black rectangle:
  *
- * Both are `position: fixed` on a pseudo-free element with no animation, so
- * they are painted once and never re-composited on scroll. Deliberately far
- * below the threshold where a gradient reads as decoration.
+ *   1. A cool signal pool behind the top of the page — the light ARIE's own
+ *      accent casts into the room.
+ *   2. A warmer counter-light from the right, so the illumination has a
+ *      direction instead of being a symmetric vignette.
+ *   3. One raking sweep across the upper third: a single directional light
+ *      source is the thing that separates "considered dark UI" from "black".
+ *   4. A lattice — the market ARIE watches, drawn as a field of faint
+ *      points that fades out as the page goes on.
+ *
+ * All of it is gradient math on `position: fixed` elements with no
+ * animation and no `filter`. It paints once and is never re-composited on
+ * scroll, which is exactly what a large blurred layer failed to do.
  */
 export function AmbientField() {
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      <div
-        className="absolute inset-x-0 top-0 h-[820px]"
-        style={{
-          background:
-            "radial-gradient(1100px 520px at 50% -18%, rgba(77,141,255,0.10), transparent 70%)",
-        }}
-      />
+      {/* 1 — signal pool, top centre-left */}
       <div
         className="absolute inset-x-0 top-0 h-[900px]"
         style={{
           background:
-            "linear-gradient(148deg, transparent 34%, rgba(255,255,255,0.028) 50%, transparent 62%)",
-          maskImage: "linear-gradient(to bottom, black 55%, transparent)",
-          WebkitMaskImage: "linear-gradient(to bottom, black 55%, transparent)",
+            "radial-gradient(1200px 620px at 38% -12%, rgba(79,227,193,0.18), rgba(79,227,193,0.05) 42%, transparent 72%)",
         }}
       />
-      {/* Hairline grid, fading out downward. Reads as graph paper under the
-          content rather than as a visible pattern. */}
+      {/* 2 — beam counter-light, upper right */}
       <div
-        className="absolute inset-x-0 top-0 h-[640px] opacity-[0.16]"
+        className="absolute inset-x-0 top-0 h-[900px]"
+        style={{
+          background:
+            "radial-gradient(900px 520px at 88% 2%, rgba(108,140,255,0.19), transparent 68%)",
+        }}
+      />
+      {/* 3 — raking sweep */}
+      <div
+        className="absolute inset-x-0 top-0 h-[1000px]"
+        style={{
+          background:
+            "linear-gradient(152deg, transparent 30%, rgba(255,255,255,0.045) 48%, transparent 64%)",
+          maskImage: "linear-gradient(to bottom, black 50%, transparent)",
+          WebkitMaskImage: "linear-gradient(to bottom, black 50%, transparent)",
+        }}
+      />
+      {/* 4 — the market lattice: points, not a grid of boxes */}
+      <div
+        className="absolute inset-x-0 top-0 h-[820px] opacity-[0.5]"
         style={{
           backgroundImage:
-            "linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          maskImage: "linear-gradient(to bottom, black, transparent 88%)",
-          WebkitMaskImage: "linear-gradient(to bottom, black, transparent 88%)",
+            "radial-gradient(circle at 1px 1px, rgba(154,164,180,0.16) 1px, transparent 0)",
+          backgroundSize: "38px 38px",
+          maskImage:
+            "radial-gradient(1100px 620px at 45% 6%, black, rgba(0,0,0,0.35) 55%, transparent 82%)",
+          WebkitMaskImage:
+            "radial-gradient(1100px 620px at 45% 6%, black, rgba(0,0,0,0.35) 55%, transparent 82%)",
+        }}
+      />
+      {/* 5 — floor: the page darkens as it goes down, so content lower in
+          a long page sits deeper in the room rather than floating in the
+          same flat void as the hero. */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[70vh]"
+        style={{
+          background: "linear-gradient(to bottom, transparent, rgba(4,5,8,0.55))",
         }}
       />
     </div>

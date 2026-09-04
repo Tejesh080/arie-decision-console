@@ -12,17 +12,21 @@ import { DURATION, EASE_OUT } from "@/lib/motion";
  * Deliberately entrance-only. An exit animation would hold the old page on
  * screen after the click, which makes navigation feel slower than it is —
  * the one thing a transition must never do.
+ *
+ * Reduced motion changes the *duration*, never the tree or the initial
+ * style. `useReducedMotion()` is false during SSR and can be true on the
+ * client, so branching the markup here (`if (reduced) return children`)
+ * renders a different tree on each side and trips a hydration mismatch for
+ * exactly the people who asked for less motion.
  */
 export default function Template({ children }: { children: React.ReactNode }) {
   const reduced = useReducedMotion();
-
-  if (reduced) return <>{children}</>;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: DURATION.page, ease: EASE_OUT }}
+      transition={reduced ? { duration: 0 } : { duration: DURATION.page, ease: EASE_OUT }}
     >
       {children}
     </motion.div>

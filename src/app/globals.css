@@ -1,115 +1,156 @@
 @import "tailwindcss";
 
+/* Animatable custom property for the spectral border's conic rotation.
+   Must live at the stylesheet's top level — @property inside @layer is
+   ignored by every current browser. */
+@property --spectral-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 /* =====================================================================
-   ARIE — "The Instrument" design system.
+   ARIE — "Signal Intelligence" design system.
 
-   ARIE is a calibrated measuring instrument for decisions, not a general
-   dashboard. Three rules govern everything below:
+   ARIE watches a market, finds the companies with a reason to care right
+   now, verifies the evidence, and names the person who owns the problem.
+   The visual language is built from that: signal, evidence, state change.
 
-   1. COLOUR IS MEANING. There is exactly one decorative accent (--machine,
-      which doubles as the product accent). Every other hue is load-bearing:
-      machine / human / qualify / reject / shadow each name one real concept
-      in the decision contract and are never reused for decoration.
-   2. HIERARCHY COMES FROM SCALE, NOT COLOUR. Display type is large and
-      tightly tracked; everything else is small. A screen should read at a
-      glance in greyscale.
-   3. SURFACES ARE MACHINED, NOT GLASS. 1px hairline + a top inner highlight
-      + a low-spread shadow. No blurred glass panels, no neon glow.
+   Four rules govern everything below:
 
-   Always dark. There is no light theme: this is an instrument panel.
+   1. LIGHT IS THE MATERIAL. Depth comes from layered graphite surfaces and
+      soft edge light, not from stacks of hairline boxes. Borders are used
+      where they carry meaning, not as the default container treatment.
+   2. LUMINOUS COLOUR IS RARE. Signal cyan means verified/live. Beam blue
+      means the system reasoning. Amber means a human is needed. Coral means
+      stopped. Violet means observed but not acted on. Nothing is tinted for
+      decoration — when colour glows, it means something happened.
+   3. HIERARCHY FROM SCALE AND WEIGHT. Display type is large, tight and
+      confident; supporting type is calm. No wall of 11px uppercase.
+   4. MOTION EXPLAINS CHANGE. Springs for anything you touch, eased
+      transforms for anything spatial. Nothing moves decoratively.
+
+   Always dark: this is an instrument you watch a market through.
    ===================================================================== */
 
 :root {
-  /* -- Surfaces: an elevation ladder, each step a small luminance step -- */
-  --bg: #08090b;
-  --bg-sunken: #050609;
-  --surface: #0d0f13;
-  --surface-2: #131519;
-  --surface-3: #191c22;
-  --surface-hover: #16191f;
+  /* -- Surfaces: cool graphite, never flat black. Each step is a real
+        luminance step so an elevated island reads without a border. ----- */
+  --void: #06070a;
+  --bg: #0a0c11;
+  --bg-sunken: #070810;
+  --surface: #10131a;
+  --surface-2: #161a23;
+  --surface-3: #1d222d;
+  --surface-hover: #191e29;
 
-  /* -- Borders --------------------------------------------------------- */
-  --border: #1e222a;
-  --border-strong: #2b303a;
-  --border-loud: #3a404c;
+  /* -- Borders: quieter than before, and cooler. ----------------------- */
+  --border: #1e232e;
+  --border-strong: #2a3140;
+  --border-loud: #3a4353;
 
   /* -- Text ------------------------------------------------------------ */
-  --text: #e9ebef;
-  --text-dim: #949aa6;
-  /* Lightened from #636a77, which measured 3.5:1 on --surface. Everything
-     wearing this colour is small (captions, ids, footnotes, table headers),
-     so it needs the 4.5:1 normal-text bar, not the 3:1 large-text one. This
-     value clears 4.5:1 against every surface in the ladder above. */
-  --text-faint: #7d8491;
+  --text: #eef1f6;
+  --text-dim: #9aa4b4;
+  /* Small text (captions, ids, footnotes) needs the 4.5:1 normal-text bar,
+     not the 3:1 large-text one. This clears it on every surface above. */
+  --text-faint: #7e8899;
 
-  /* -- Role colours ----------------------------------------------------
-     Each names one concept in the decision contract. `-dim` is the tinted
-     surface behind a badge; `-edge` is its border; `-wash` is a very low
-     alpha fill for large areas (rails, bands). Pre-computed rather than
+  /* -- Signal family ---------------------------------------------------
+     Each names one real state. `-dim` is the tinted fill behind a chip,
+     `-edge` its border, `-wash` a low-alpha fill for rails and bands, and
+     `-glow` the rgba used for light effects. Pre-computed rather than
      color-mix()'d so a token can never resolve to nothing. */
-  --machine: #4d8dff; /* the policy's own recommendation; also THE accent */
-  --machine-dim: #16233d;
-  --machine-edge: #2f4d85;
-  --machine-wash: rgba(77, 141, 255, 0.09);
 
-  --human: #e3a53a; /* a human reviewer's action */
-  --human-dim: #33260e;
-  --human-edge: #6d5320;
-  --human-wash: rgba(227, 165, 58, 0.09);
+  /* The system's own reasoning: search, inference, the beam it casts. */
+  --machine: #6c8cff;
+  --machine-dim: #171d33;
+  --machine-edge: #35447a;
+  --machine-wash: rgba(108, 140, 255, 0.09);
+  --machine-glow: rgba(108, 140, 255, 0.5);
 
-  --qualify: #35d399; /* final outcome: routed / qualified */
-  --qualify-dim: #0e2f24;
-  --qualify-edge: #1f6349;
-  --qualify-wash: rgba(53, 211, 153, 0.09);
+  /* Verified, live, worth acting on. ARIE's signature colour. */
+  --qualify: #4fe3c1;
+  --qualify-dim: #0c2a26;
+  --qualify-edge: #1d6357;
+  --qualify-wash: rgba(79, 227, 193, 0.09);
+  --qualify-glow: rgba(79, 227, 193, 0.5);
 
-  --reject: #f2646f; /* final outcome: rejected, and genuine errors */
-  --reject-dim: #36171b;
-  --reject-edge: #78323a;
-  --reject-wash: rgba(242, 100, 111, 0.09);
+  /* Unresolved — a person has to look at this. */
+  --human: #f5b65c;
+  --human-dim: #33260f;
+  --human-edge: #6f5525;
+  --human-wash: rgba(245, 182, 92, 0.09);
+  --human-glow: rgba(245, 182, 92, 0.45);
 
-  --pending: #8b929e; /* in progress — deliberately neutral */
-  --pending-dim: #1a1d23;
-  --pending-edge: #333944;
+  /* Stopped, rejected, failed. */
+  --reject: #ff6b7b;
+  --reject-dim: #351a1f;
+  --reject-edge: #7a343e;
+  --reject-wash: rgba(255, 107, 123, 0.09);
 
-  --shadow-role: #a78bfa; /* shadow evaluation: computed, never authoritative */
-  --shadow-dim: #221c3b;
-  --shadow-edge: #4c3f80;
-  --shadow-wash: rgba(167, 139, 250, 0.09);
+  /* In flight — deliberately colourless. */
+  --pending: #8b93a3;
+  --pending-dim: #191d26;
+  --pending-edge: #333b49;
+
+  /* Watched, computed, never acted on. */
+  --shadow-role: #9e86ff;
+  --shadow-dim: #201b38;
+  --shadow-edge: #493f7d;
+  --shadow-wash: rgba(158, 134, 255, 0.09);
 
   /* -- Radii ----------------------------------------------------------- */
-  --r-sm: 6px;
-  --r-md: 9px;
-  --r-lg: 13px;
-  --r-xl: 18px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 26px;
+  --r-2xl: 34px;
   --r-pill: 999px;
 
-  /* -- Elevation: low spread, high softness. Instruments cast short,
-        tight shadows — never a diffuse marketing-card drop. ------------- */
-  --e-1: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --e-2: 0 2px 6px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --e-3: 0 10px 30px -12px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
+  /* -- Elevation: soft and deep. A card floats above the page; it is not
+        machined into it. ------------------------------------------------ */
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --e-2: 0 6px 20px -8px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --e-3: 0 22px 50px -18px rgba(0, 0, 0, 0.75), 0 4px 12px -4px rgba(0, 0, 0, 0.4);
+  --e-4: 0 40px 90px -30px rgba(0, 0, 0, 0.85), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
 
-  /* Top inner highlight — the single trick that makes a flat panel read as
-     a physical machined surface under overhead light. */
-  --inner-lip: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  /* Edge light: the top rim catching light from above. The single trick
+     that lets a surface read as a physical object with no border at all. */
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  --edge-strong: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --inner-lip: var(--edge); /* legacy alias */
 
   /* -- Motion ----------------------------------------------------------
-     Critically damped, fast, controlled. No bounce: an instrument that
-     overshoots is a broken instrument. */
+     Four bands, and everything in the app picks one. Springs are all
+     critically damped: an instrument that overshoots reads as a toy. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --t-fast: 130ms;
-  --t-base: 200ms;
-  --t-slow: 340ms;
+  --t-fast: 140ms; /* colour, opacity, press */
+  --t-base: 200ms; /* interactive feedback */
+  --t-slow: 380ms; /* spatial: layout, reveal */
+  --t-cine: 640ms; /* cinematic: hero, section state */
 
-  /* -- Fonts (bound in layout.tsx via next/font) ------------------------ */
+  /* -- Fonts (bound in layout.tsx via next/font) ------------------------
+     Three voices: sans for interface, mono for the machine/data voice, and
+     an editorial display serif reserved for hero-scale moments — it is
+     never used below ~2rem, so it reads as a deliberate register shift
+     rather than a second body font. */
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-data: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+
+  /* -- Pointer light: written by usePointerGlow() on the element itself
+        (direct DOM mutation, not React state) so hover-tracking light never
+        forces a re-render. Falls back to a fixed position when unset. ---- */
+  --px: 50%;
+  --py: 38%;
 
   color-scheme: dark;
 }
 
 @theme inline {
+  --color-void: var(--void);
   --color-bg: var(--bg);
   --color-bg-sunken: var(--bg-sunken);
   --color-surface: var(--surface);
@@ -148,9 +189,11 @@
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
 
   --font-sans: var(--font-sans);
   --font-data: var(--font-data);
+  --font-display: var(--font-display);
 }
 
 /* ------------------------------------------------------------------ base */
@@ -161,6 +204,10 @@
   border-color: var(--border);
 }
 
+/* Deliberately no global `scroll-behavior: smooth`: it animates every
+   programmatic scroll too, including the ones the browser performs to bring
+   a focused element into view, which makes keyboard navigation feel laggy
+   and unpredictable. */
 html {
   color-scheme: dark;
   -webkit-tap-highlight-color: transparent;
@@ -173,23 +220,51 @@ body {
   font-synthesis-weight: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* Fine grain. Fixed + pseudo-element so it never repaints on scroll, and
-   deliberately faint enough to read as texture rather than noise. */
+   faint enough to read as texture rather than noise. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.028;
+  opacity: 0.022;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 ::selection {
-  background: var(--machine-edge);
+  background: rgba(79, 227, 193, 0.26);
   color: #fff;
+}
+
+/* Scrollbar: part of the product, not the browser's default furniture. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-loud) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-loud);
+  background-clip: content-box;
 }
 
 /* One focus ring for every interactive element that isn't a text field.
@@ -198,16 +273,13 @@ body::before {
    Written with `:is()` rather than `:where()` on purpose. `:where()`
    contributes zero specificity, so the user-agent's own :focus-visible rule
    won the `outline-color` cascade and every ring was painted in
-   currentColor -- visible, but a different colour on each control instead of
-   the one accent. */
+   currentColor. */
 :is(a, button, [role="button"], [role="switch"], summary, input[type="checkbox"]):focus-visible {
-  outline: 2px solid var(--machine);
+  outline: 2px solid var(--qualify);
   outline-offset: 2px;
   border-radius: var(--r-sm);
-  /* A focus ring must never fade in. Several of these elements carry
-     Tailwind's `transition-colors`, whose property list includes
-     outline-color, so without this the indicator animates up from the
-     element's own text colour over 130ms instead of simply appearing. */
+  /* A focus ring must never fade in — several of these carry
+     `transition-colors`, whose property list includes outline-color. */
   transition: none;
 }
 
@@ -217,6 +289,10 @@ body::before {
    useReducedMotion() so they render their *final* state rather than a
    0.001ms-fast version of the animation. */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
@@ -228,55 +304,68 @@ body::before {
 }
 
 @layer components {
-  /* ------------------------------------------------------------- typography */
+  /* ------------------------------------------------------------ typography */
 
   .t-display {
-    font-size: clamp(2.25rem, 1.3rem + 3.1vw, 3.9rem);
+    font-size: clamp(2.6rem, 1.1rem + 4.4vw, 5.1rem);
     line-height: 1.02;
-    letter-spacing: -0.035em;
-    font-weight: 500;
+    letter-spacing: -0.038em;
+    font-weight: 620;
   }
 
   .t-h1 {
-    font-size: clamp(1.7rem, 1.25rem + 1.5vw, 2.4rem);
-    line-height: 1.1;
-    letter-spacing: -0.028em;
-    font-weight: 500;
+    font-size: clamp(1.95rem, 1.3rem + 2.2vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.032em;
+    font-weight: 600;
   }
 
   .t-h2 {
-    font-size: clamp(1.2rem, 1.05rem + 0.6vw, 1.5rem);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-    font-weight: 500;
+    font-size: clamp(1.45rem, 1.15rem + 1.1vw, 2.05rem);
+    line-height: 1.14;
+    letter-spacing: -0.028em;
+    font-weight: 600;
   }
 
   .t-h3 {
-    font-size: 1.0625rem;
+    font-size: 1.125rem;
     line-height: 1.35;
-    letter-spacing: -0.014em;
-    font-weight: 550;
+    letter-spacing: -0.018em;
+    font-weight: 570;
   }
 
-  /* The number voice: large, tabular, tightly tracked. Used for every figure
-     a reader compares against another figure. */
+  /* A lead paragraph — the one that sits under a display heading. Larger
+     and calmer than body copy, with a line length that stays readable. */
+  .t-lead {
+    font-size: clamp(1.0625rem, 1rem + 0.28vw, 1.1875rem);
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+    color: var(--text-dim);
+  }
+
+  /* The number voice: large, tabular, tightly tracked. Every figure a
+     reader compares against another figure wears this. */
   .t-metric {
     font-family: var(--font-data);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.035em;
     font-weight: 500;
     line-height: 1;
   }
 
+  /* Section/field labels. Deliberately calmer than the old 0.13em
+     all-caps: still a label, no longer shouting across every screen. */
   .t-label {
-    font-family: var(--font-data);
-    font-size: 0.6875rem;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
     line-height: 1.3;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    font-weight: 500;
+    letter-spacing: 0.02em;
+    font-weight: 560;
+    text-transform: none;
   }
 
+  /* Reserved for genuine machine output: ids, domains, timestamps,
+     provider names, raw evidence. Monospace *means* something here. */
   .t-data {
     font-family: var(--font-data);
     font-size: 0.78125rem;
@@ -284,26 +373,370 @@ body::before {
     font-variant-numeric: tabular-nums;
   }
 
+  /* The one place small caps survive: a system tag on evidence and state,
+     where the mechanical voice is the point. */
+  .t-sys {
+    font-family: var(--font-data);
+    font-size: 0.6875rem;
+    line-height: 1.3;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* ------------------------------------------------------------ editorial
+     The display voice. Reserved for hero-scale moments: it is a register
+     shift, not a heavier heading size. `font-variation-settings` reaches
+     Fraunces's optical-size and softness axes directly — its default
+     weight at display sizes reads thin and undramatic without them. */
+  .t-editorial {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 460;
+    font-variation-settings: "opsz" 144, "SOFT" 40, "WONK" 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* The word still forming — quieter than the market text around it, but
+     always legible: a solid dim fill (never a hollow stroke — that read as
+     "invisible" rather than "quiet" against the graphite background) with a
+     crisp outline for definition, breathing gently between two readable
+     opacities. */
+  .t-noise {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 440;
+    font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+    color: rgba(186, 195, 209, 0.82);
+    -webkit-text-stroke: 0.6px rgba(186, 195, 209, 0.4);
+    animation: arie-dissolve 4.2s var(--ease-in-out) infinite;
+  }
+
+  @keyframes arie-dissolve {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.68;
+    }
+  }
+
+  /* The signal word: three stacked layers sharing one grid cell — a
+     diffused halo, a moving luminous core, and a crisp defining stroke.
+     Bounded to a single word's box, never the viewport: the blur here costs
+     nothing like a full-screen filter would. */
+  .signal-word {
+    position: relative;
+    display: inline-grid;
+    isolation: isolate;
+  }
+
+  .signal-word > * {
+    grid-area: 1 / 1;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 480;
+    font-variation-settings: "opsz" 144, "SOFT" 46, "WONK" 0;
+    letter-spacing: -0.01em;
+  }
+
+  .signal-word__halo {
+    color: transparent;
+    -webkit-text-stroke: 3px rgba(79, 227, 193, 0.55);
+    filter: blur(9px);
+    opacity: 0.7;
+  }
+
+  .signal-word__core {
+    background: linear-gradient(
+      100deg,
+      #eafff8 0%,
+      var(--qualify) 20%,
+      #bdf6ea 38%,
+      var(--qualify) 56%,
+      #59d8ff 74%,
+      var(--qualify) 90%,
+      #eafff8 100%
+    );
+    background-size: 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: arie-signal-sweep 7s linear infinite;
+  }
+
+  @keyframes arie-signal-sweep {
+    from {
+      background-position: 0% 50%;
+    }
+    to {
+      background-position: -260% 50%;
+    }
+  }
+
+  .signal-word__stroke {
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(239, 245, 248, 0.65);
+    mix-blend-mode: screen;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .t-noise,
+    .signal-word__core {
+      animation: none;
+    }
+  }
+
   /* ---------------------------------------------------------------- surface */
 
-  /* The machined-panel treatment: hairline + top inner lip + tight shadow. */
+  /* An island: a raised plane lit from above. No border by default — the
+     luminance step plus the edge light is what separates it from the page.
+     This is the app's primary container. */
+  .island {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 42%),
+      var(--surface);
+    border-radius: var(--r-lg);
+    box-shadow: var(--e-2), var(--edge);
+  }
+
+  /* A quieter island for nested content: still raised, no shadow. */
+  .island-inset {
+    background: var(--bg-sunken);
+    border-radius: var(--r-md);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  }
+
+  /* Legacy container classes, retuned to the new material so every screen
+     that hasn't been re-composed yet still inherits the new language. */
   .surface {
-    background: var(--surface);
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 42%),
+      var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
-    box-shadow: var(--e-2), var(--inner-lip);
+    box-shadow: var(--e-2), var(--edge);
   }
 
   .surface-flat {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
+    transition:
+      border-color var(--t-base) var(--ease-out),
+      box-shadow var(--t-base) var(--ease-out),
+      background-color var(--t-base) var(--ease-out);
   }
 
   .surface-sunken {
     background: var(--bg-sunken);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
+  }
+
+  /* A hairline that fades out at both ends — a divider that doesn't box
+     anything in. */
+  .rule {
+    height: 1px;
+    border: 0;
+    background: linear-gradient(90deg, transparent, var(--border-strong) 18%, var(--border-strong) 82%, transparent);
+  }
+
+  /* Pointer-tracking light on a raised surface. Position is written to
+     --spot-x/--spot-y by the element's own pointermove handler. Gradient
+     math, not a blur filter: this composites for free. */
+  .spotlight {
+    position: relative;
+  }
+
+  .spotlight::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    opacity: 0;
+    background: radial-gradient(
+      260px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, 0.055),
+      transparent 70%
+    );
+    transition: opacity var(--t-base) var(--ease-out);
+    pointer-events: none;
+  }
+
+  .spotlight:hover::after {
+    opacity: 1;
+  }
+
+  /* ------------------------------------------------------------- material
+     The liquid/refractive surface family. Not `background: rgba()` +
+     `backdrop-filter: blur()` alone — each surface is: a translucent
+     substrate, a pointer-aware local reflection (gradient math against
+     `--px`/`--py`, written by `usePointerGlow()` — no per-frame React
+     render), a 1px directional top-edge highlight (mask-composite ring, not
+     a border), and an inner shadow that gives the plane real thickness.
+     Every blur here is local to the element's own box — never a
+     viewport-sized filter. */
+  .liquid-surface {
+    position: relative;
+    border-radius: var(--r-xl);
+    background:
+      radial-gradient(
+        460px circle at var(--px) var(--py),
+        rgba(255, 255, 255, 0.09),
+        transparent 62%
+      ),
+      linear-gradient(165deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0) 50%),
+      rgba(24, 28, 38, 0.78);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow:
+      var(--e-3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -18px 30px -26px rgba(0, 0, 0, 0.7);
+  }
+
+  /* The directional edge: a hairline of light along the top, fading around
+     the rest of the rim. Built from a masked padding-box ring rather than a
+     border, so it reads as light catching a physical edge. */
+  .liquid-edge {
+    position: relative;
+  }
+
+  .liquid-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16),
+      rgba(255, 255, 255, 0.02) 22%,
+      rgba(255, 255, 255, 0) 55%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* A slow conic sweep of the signal palette, masked down to a 1px ring.
+     Reserved for the two or three surfaces per screen that should read as
+     genuinely premium — not a default card treatment. */
+  .spectral-edge {
+    position: relative;
+  }
+
+  .spectral-edge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--spectral-angle),
+      rgba(79, 227, 193, 0.65),
+      rgba(89, 216, 255, 0.45) 30%,
+      rgba(158, 134, 255, 0.4) 55%,
+      rgba(79, 227, 193, 0.65) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.55;
+    animation: arie-spectral-rotate 9s linear infinite;
+    pointer-events: none;
+    transition: opacity var(--t-base) var(--ease-out);
+  }
+
+  .spectral-edge:hover::after,
+  .spectral-edge:focus-within::after {
+    opacity: 0.95;
+  }
+
+  @keyframes arie-spectral-rotate {
+    to {
+      --spectral-angle: 360deg;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spectral-edge::after {
+      animation: none;
+    }
+  }
+
+  /* The floating dock's material: brighter and more saturated than a card,
+     since it sits over moving content rather than the static page. */
+  .glass-dock {
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.075),
+        rgba(255, 255, 255, 0.02) 55%,
+        rgba(255, 255, 255, 0) 100%
+      ),
+      rgba(12, 15, 21, 0.62);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  /* A grain wash for large hero-scale surfaces — the same fixed-noise
+     technique as the page grain, sized down and local to the element. */
+  .grain-veil {
+    position: relative;
+  }
+
+  .grain-veil::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* A button's own local light: a soft highlight that follows the pointer,
+     via `usePointerGlow()` writing `--px`/`--py` directly to the element —
+     no re-render per hover-move. `mix-blend-mode: overlay` lets one gradient
+     read correctly against both the bright filled variants and the dark
+     neutral ones. */
+  .btn-glow {
+    isolation: isolate;
+  }
+
+  .btn-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    opacity: 0;
+    mix-blend-mode: overlay;
+    background: radial-gradient(
+      140px circle at var(--px, 50%) var(--py, 50%),
+      rgba(255, 255, 255, 0.85),
+      transparent 70%
+    );
+    transition: opacity var(--t-base) var(--ease-out);
+    pointer-events: none;
+  }
+
+  .btn-glow:hover::after {
+    opacity: 0.55;
   }
 
   /* --------------------------------------------------------------- controls */
@@ -316,10 +749,10 @@ body::before {
     border: 1px solid var(--border-strong);
     background: var(--bg-sunken);
     color: var(--text);
-    padding: 0.5625rem 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.9375rem;
     font-family: inherit;
-    box-shadow: var(--inner-lip);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
     transition:
       border-color var(--t-fast) var(--ease-out),
       background var(--t-fast) var(--ease-out),
@@ -329,6 +762,7 @@ body::before {
   .textarea {
     resize: vertical;
     min-height: 5.25rem;
+    line-height: 1.55;
   }
 
   .input:hover:not(:disabled):not(:focus),
@@ -340,9 +774,9 @@ body::before {
   .textarea:focus,
   .select:focus {
     outline: none;
-    border-color: var(--machine);
-    background: var(--surface-2);
-    box-shadow: 0 0 0 3px var(--machine-wash);
+    border-color: var(--qualify-edge);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px var(--qualify-wash);
   }
 
   .input:disabled,
@@ -372,7 +806,7 @@ body::before {
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.035) 45%,
+      rgba(255, 255, 255, 0.04) 45%,
       transparent 90%
     );
     background-size: 180% 100%;
@@ -395,6 +829,39 @@ body::before {
     animation: arie-breathe 2.4s var(--ease-in-out) infinite;
   }
 
+  /* A signal ring: one soft pulse outward, used when something becomes
+     live. Transform + opacity only. */
+  @keyframes arie-ping {
+    0% {
+      transform: scale(0.6);
+      opacity: 0.55;
+    }
+    70% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(2.1);
+      opacity: 0;
+    }
+  }
+
+  .signal-ping {
+    animation: arie-ping 2.6s var(--ease-out) infinite;
+  }
+
+  /* Idle drift for floating evidence fragments — small enough to read as
+     "alive," never enough to distract from the card it orbits. */
+  @keyframes arie-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+
   /* Scrollable regions inside cards keep their own scrollbar subtle. */
   .scroll-x {
     overflow-x: auto;
@@ -409,6 +876,7 @@ body::before {
   .scroll-x::-webkit-scrollbar-thumb {
     background: var(--border-loud);
     border-radius: var(--r-pill);
+    border: 0;
   }
 
   .scroll-x::-webkit-scrollbar-track {
