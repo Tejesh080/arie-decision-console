@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
 import { SPRING_SNAP } from "@/lib/motion";
+import { SystemStatus } from "./SystemStatus";
 
 /**
  * The overflow disclosure for configuration-ish nav items.
@@ -89,7 +90,7 @@ export function NavMore({ items }: { items: ReadonlyArray<{ href: string; label:
             exit={reduced ? undefined : { opacity: 0, y: -4, scale: 0.98 }}
             transition={SPRING_SNAP}
             className={clsx(
-              "absolute top-[calc(100%+10px)] right-0 z-50 w-56 origin-top-right overflow-hidden rounded-2xl",
+              "absolute top-[calc(100%+10px)] right-0 z-50 w-72 origin-top-right overflow-hidden rounded-2xl",
               "border border-white/[0.08] bg-[rgba(18,21,29,0.95)] p-1.5 backdrop-blur-2xl",
               "shadow-[0_30px_70px_-28px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.07)]",
             )}
@@ -115,6 +116,8 @@ export function NavMore({ items }: { items: ReadonlyArray<{ href: string; label:
                 </Link>
               );
             })}
+
+            <SystemStatus />
           </motion.div>
         )}
       </AnimatePresence>

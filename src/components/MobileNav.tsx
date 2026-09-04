@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import clsx from "clsx";
 import { SPRING_SNAP, stagger } from "@/lib/motion";
 import { tapHaptic } from "@/lib/haptics";
+import { SystemStatus } from "./SystemStatus";
 
 /**
  * The `lg:hidden` counterpart to the dock's primary row: below `lg` there
@@ -127,6 +128,8 @@ export function MobileNav({ items }: { items: ReadonlyArray<{ href: string; labe
                   );
                 })}
               </motion.ul>
+
+              <SystemStatus />
             </motion.nav>
           </>
         )}

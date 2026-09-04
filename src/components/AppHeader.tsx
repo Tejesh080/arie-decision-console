@@ -10,7 +10,6 @@ import { Magnetic } from "@/components/ui/Magnetic";
 import { Wordmark } from "./brand/Mark";
 import { CommandLauncher } from "./CommandPalette";
 import { ConnectionStatus } from "./ConnectionStatus";
-import { DemoModeChip } from "./DemoModeChip";
 import { MobileNav } from "./MobileNav";
 import { NavMore } from "./NavMore";
 import { SignOutButton } from "./SignOutButton";
@@ -142,7 +141,6 @@ export function AppHeader({ showDescriptor = true }: { showDescriptor?: boolean 
         <MobileNav items={[...PRIMARY_NAV, ...SECONDARY_NAV]} />
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <DemoModeChip className="hidden sm:flex" />
           <ConnectionStatus />
           <CommandLauncher />
           {getDataMode() === "api" && <SignOutButton />}

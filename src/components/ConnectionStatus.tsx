@@ -17,6 +17,11 @@ import type { HealthResponse } from "@/lib/api/types";
  *
  * Polls `GET /healthz` through the proxy at a slow fixed interval — never on
  * every render, never sub-second.
+ *
+ * Mock mode renders nothing here: "this is mock data" is an environment
+ * fact, not an operational problem, and doesn't belong beside primary nav.
+ * It lives in the System status disclosure (`NavMore`) instead. This
+ * component now only ever speaks about real backend connectivity.
  */
 const POLL_INTERVAL_MS = 30_000;
 
@@ -50,7 +55,9 @@ export function ConnectionStatus() {
     };
   }, [mode]);
 
-  const look = resolveLook(mode, health);
+  if (mode === "mock") return null;
+
+  const look = resolveLook(health);
 
   // Healthy is the boring case and gets the least ink: a dot and nothing else.
   // Degraded/down/connecting keep their label at every width, because those
@@ -77,17 +84,7 @@ export function ConnectionStatus() {
   );
 }
 
-function resolveLook(mode: "mock" | "api", health: HealthResponse | null): Look {
-  if (mode === "mock") {
-    return {
-      dot: "bg-human",
-      text: "text-human",
-      ring: "border-human-edge",
-      label: "Mock data",
-      pulse: false,
-      tone: "warn",
-    };
-  }
+function resolveLook(health: HealthResponse | null): Look {
   if (health === null) {
     return {
       dot: "bg-pending",
