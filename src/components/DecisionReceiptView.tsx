@@ -174,7 +174,7 @@ export function DecisionReceiptView({ leadId }: { leadId: string }) {
       {/* ---------------------------------------------------------- header */}
       <div>
         <Link
-          href="/"
+          href="/overview"
           className="inline-flex items-center gap-1.5 rounded-md text-xs text-text-faint transition-colors hover:text-text-dim"
         >
           <ArrowLeft aria-hidden className="h-3.5 w-3.5" strokeWidth={2} />
@@ -524,7 +524,7 @@ function Failure({
               Try again
             </Button>
           )}
-          <ButtonLink href="/" variant="ghost">
+          <ButtonLink href="/overview" variant="ghost">
             Back to overview
           </ButtonLink>
         </div>

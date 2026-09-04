@@ -28,7 +28,7 @@ import { SignOutButton } from "./SignOutButton";
  * status chips and "Sign out" past the edge of the screen entirely.
  */
 const PRIMARY_NAV = [
-  { href: "/", label: "Overview" },
+  { href: "/overview", label: "Overview" },
   // The primary surface: "tell me what you sell and I'll find the companies
   // worth your attention." Placed first, ahead of the CSV-first workflow it
   // demotes but doesn't remove.
@@ -100,7 +100,7 @@ export function AppHeader() {
         )}
       >
         <Link
-          href="/"
+          href="/overview"
           aria-label="ARIE, back to overview"
           className="shrink-0 rounded-full py-1 pr-1"
         >
@@ -112,7 +112,7 @@ export function AppHeader() {
           className="ml-auto hidden items-center gap-0.5 rounded-full lg:flex"
         >
           {PRIMARY_NAV.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Magnetic key={item.href} strength={6}>
                 <Link

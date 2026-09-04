@@ -8,8 +8,9 @@ import { NextResponse, type NextRequest } from "next/server";
  *    silently expires mid-visit instead of being renewed underneath the
  *    user.
  * 2. Gate page navigation: signed out and not already headed to `/login`
- *    gets redirected there; signed in and sitting on `/login` gets sent to
- *    the console instead.
+ *    (or another public route) gets redirected there; signed in and sitting
+ *    on `/login`/`/signup` gets sent to `/overview` — the authenticated app
+ *    home — instead.
  *
  * `/api/arie/*` is excluded by the matcher below on purpose — those routes
  * answer with JSON, and a 307 redirect to an HTML login page would break
@@ -25,12 +26,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * `/signup` (Productization M6 Part 17) is the self-service account-creation
  * page — by definition reached before any session exists.
  *
- * `/` is also let through signed-out: it's the public marketing homepage,
- * not console UI. `(app)/page.tsx` renders the customer dashboard when a
- * session resolves and the marketing page otherwise, so the same route
- * serves both signed-in customers and anonymous visitors. `(app)/layout.tsx`
- * mirrors this exemption — see its own comment for why reaching that layout
- * unauthenticated is only possible on this one route.
+ * `/` is also let through signed-out, and always will be: it's the public
+ * marketing homepage (`src/app/page.tsx`, outside the `(app)` route group
+ * entirely), the same composition for every visitor regardless of session.
+ * It is never redirected away from and never rewritten — only `/overview`
+ * and the rest of `(app)` require a session.
  *
  * A no-op entirely outside `api` data mode: "mock" mode is a fabricated,
  * client-side-only demo with no real backend and nothing to protect —
@@ -81,7 +81,7 @@ export async function middleware(request: NextRequest) {
 
   if (user && (onLoginPage || onSignupPage)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/overview";
     return NextResponse.redirect(url);
   }
 

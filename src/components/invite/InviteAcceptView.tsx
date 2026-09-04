@@ -189,7 +189,7 @@ export function InviteAcceptView({ token }: { token: string | null }) {
                 <CircleCheck className="h-5 w-5 shrink-0" strokeWidth={2.25} />
                 <p className="text-sm font-medium">You&apos;ve joined the organization.</p>
               </div>
-              <ButtonLink href="/" variant="primary" className="mt-5 w-full">
+              <ButtonLink href="/overview" variant="primary" className="mt-5 w-full">
                 Go to the console
               </ButtonLink>
             </>
@@ -201,7 +201,7 @@ export function InviteAcceptView({ token }: { token: string | null }) {
                 <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={2.25} />
                 <p className="text-sm leading-relaxed">{error}</p>
               </div>
-              <ButtonLink href="/" variant="secondary" className="mt-5 w-full">
+              <ButtonLink href="/overview" variant="secondary" className="mt-5 w-full">
                 Back to the console
               </ButtonLink>
             </>

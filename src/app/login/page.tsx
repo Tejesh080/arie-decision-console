@@ -36,7 +36,7 @@ export default function LoginPage() {
     // Full navigation: the middleware needs to see the new session cookie
     // on the very next request to stop redirecting here.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.assign("/");
+    window.location.assign("/overview");
   }
 
   return (
