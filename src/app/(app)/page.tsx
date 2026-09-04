@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { ArrowRight, MonitorSmartphone, Search } from "lucide-react";
 import { getDataMode } from "@/lib/api/mode";
+import { useIsAuthenticated } from "@/lib/auth/AuthStateContext";
 import { getLead } from "@/lib/api/leads";
 import { getRecentLeads, type RecentLeadEntry } from "@/lib/localHistory";
 import type { LeadResponse } from "@/lib/api/types";
@@ -29,19 +30,11 @@ export default function OverviewPage() {
   const router = useRouter();
   const reduced = useReducedMotion();
 
-  // `null` until `CustomerDashboard`'s fetch resolves — the marketing block
-  // defaults to *shown* rather than hidden, so the server-rendered HTML
-  // (what a crawler, a link-unfurl bot, or a signed-out visitor's first
-  // paint sees) is always the public page, never a blank shell waiting on a
-  // client fetch. It's hidden only once a real dashboard is confirmed,
-  // which costs a real signed-in customer a brief flash of the pitch before
-  // their dashboard replaces it — a much smaller cost than every other
-  // visitor and every crawler seeing nothing.
-  const [dashboardAvailable, setDashboardAvailable] = useState<boolean | null>(null);
-  const handleDashboardAvailable = useCallback((available: boolean) => {
-    setDashboardAvailable(available);
-  }, []);
-  const showMarketing = mode !== "api" || dashboardAvailable !== true;
+  // Resolved server-side by `(app)/layout.tsx` and handed down via context —
+  // known on the very first render, server and client alike, so there is no
+  // fetch to wait on and no flash of the wrong content while one resolves.
+  const authenticated = useIsAuthenticated();
+  const showMarketing = !authenticated;
 
   // The hero settles back and dims as the next section arrives, so the page
   // reads as one camera move rather than two stacked screens.
@@ -117,12 +110,10 @@ export default function OverviewPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
-      {/* A real customer's own operational dashboard. Attempted only in
-          "api" mode; the marketing block below renders alongside it until
-          the fetch confirms a real dashboard exists, then drops out — see
-          `showMarketing` above for why it defaults to shown rather than
-          hidden. */}
-      {mode === "api" && <CustomerDashboard onAvailable={handleDashboardAvailable} />}
+      {/* A real customer's own operational dashboard — rendered exactly
+          when the marketing block below isn't, per the same `authenticated`
+          flag, so the two can never both show or both stay hidden. */}
+      {authenticated && <CustomerDashboard />}
 
       {showMarketing && (
         <>
