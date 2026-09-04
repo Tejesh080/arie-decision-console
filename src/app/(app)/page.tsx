@@ -29,15 +29,19 @@ export default function OverviewPage() {
   const router = useRouter();
   const reduced = useReducedMotion();
 
-  // `null` while `CustomerDashboard`'s fetch is still in flight (or hasn't
-  // been asked to run at all, in mock mode) — the marketing block stays
-  // hidden until we know for sure it's needed, so a signed-in customer never
-  // sees the pitch flash in before their real dashboard replaces it.
+  // `null` until `CustomerDashboard`'s fetch resolves — the marketing block
+  // defaults to *shown* rather than hidden, so the server-rendered HTML
+  // (what a crawler, a link-unfurl bot, or a signed-out visitor's first
+  // paint sees) is always the public page, never a blank shell waiting on a
+  // client fetch. It's hidden only once a real dashboard is confirmed,
+  // which costs a real signed-in customer a brief flash of the pitch before
+  // their dashboard replaces it — a much smaller cost than every other
+  // visitor and every crawler seeing nothing.
   const [dashboardAvailable, setDashboardAvailable] = useState<boolean | null>(null);
   const handleDashboardAvailable = useCallback((available: boolean) => {
     setDashboardAvailable(available);
   }, []);
-  const showMarketing = mode !== "api" || dashboardAvailable === false;
+  const showMarketing = mode !== "api" || dashboardAvailable !== true;
 
   // The hero settles back and dims as the next section arrives, so the page
   // reads as one camera move rather than two stacked screens.
@@ -114,12 +118,10 @@ export default function OverviewPage() {
   return (
     <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
       {/* A real customer's own operational dashboard. Attempted only in
-          "api" mode; the marketing block below is what renders instead
-          once we know there's no dashboard to show — a signed-out visitor
-          on the public homepage, or (mock mode) a demo visitor who was
-          never going to have one. A signed-in customer with a real
-          dashboard never sees the pitch for the product they're already
-          using appear underneath it. */}
+          "api" mode; the marketing block below renders alongside it until
+          the fetch confirms a real dashboard exists, then drops out — see
+          `showMarketing` above for why it defaults to shown rather than
+          hidden. */}
       {mode === "api" && <CustomerDashboard onAvailable={handleDashboardAvailable} />}
 
       {showMarketing && (
