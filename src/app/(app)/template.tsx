@@ -18,13 +18,19 @@ import { DURATION, EASE_OUT } from "@/lib/motion";
  * client, so branching the markup here (`if (reduced) return children`)
  * renders a different tree on each side and trips a hydration mismatch for
  * exactly the people who asked for less motion.
+ *
+ * `initial` is `opacity: 1`, deliberately. This wraps every authenticated
+ * route's entire content — if Motion is slow to hydrate, errors, or never
+ * runs at all, this SSR's `initial` state is what a visitor is stuck
+ * looking at. It must be the real page, not a hidden one. The transition is
+ * a small `y` rise only: motion the page can lose without losing content.
  */
 export default function Template({ children }: { children: React.ReactNode }) {
   const reduced = useReducedMotion();
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 1, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={reduced ? { duration: 0 } : { duration: DURATION.page, ease: EASE_OUT }}
     >

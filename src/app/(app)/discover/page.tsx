@@ -121,7 +121,12 @@ export default function DiscoverPage() {
         // `initial` never branches on reduced motion: it is rendered on the
         // server, where `useReducedMotion()` is always false, so a branch
         // here would mismatch on hydration. Only the timing changes.
-        initial={{ opacity: 0, y: 14 }}
+        //
+        // `opacity: 1` in `initial`, deliberately — this is the primary
+        // discovery form, not a decorative reveal. It must be visible in
+        // the server-rendered HTML with zero dependency on Motion actually
+        // hydrating; the only thing `animate` adds is the small rise.
+        initial={{ opacity: 1, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={
           reduced ? { duration: 0 } : { duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }
@@ -174,7 +179,7 @@ export default function DiscoverPage() {
             onChange={(e) => setMarket(e.target.value)}
             placeholder="anywhere"
             disabled={running}
-            className="w-[9rem] min-w-0 flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-[1.0625rem] text-text transition-colors placeholder:text-text-faint hover:border-white/[0.18] focus:border-qualify-edge focus:ring-3 focus:ring-qualify-wash focus:outline-none disabled:opacity-50 sm:max-w-[16rem] sm:text-[1.1875rem]"
+            className="min-w-[7.5rem] flex-1 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-[1.0625rem] text-text transition-colors placeholder:text-text-faint hover:border-white/[0.18] focus:border-qualify-edge focus:ring-3 focus:ring-qualify-wash focus:outline-none disabled:opacity-50 sm:max-w-[16rem] sm:text-[1.1875rem]"
           />
 
           <span className="text-text">that fit</span>

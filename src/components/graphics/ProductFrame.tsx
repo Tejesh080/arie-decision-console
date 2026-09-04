@@ -65,7 +65,7 @@ export function ProductFrame() {
       {/* Floating badges — outside the frame, each one a plain, self-
           explanatory fact rather than an unlabelled node in a diagram. */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 1, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={arrive(0.5)}
         style={{ animation: reduced ? undefined : "arie-float 7.5s ease-in-out infinite" }}
@@ -78,7 +78,7 @@ export function ProductFrame() {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 1, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={arrive(0.65)}
         style={{ animation: reduced ? undefined : "arie-float 8.5s ease-in-out infinite 0.4s" }}
@@ -92,7 +92,7 @@ export function ProductFrame() {
 
       {/* The frame itself. */}
       <motion.div
-        initial={{ opacity: 0, y: 26, scale: 0.97 }}
+        initial={{ opacity: 1, y: 26, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={arrive(0.2)}
         className="liquid-surface liquid-edge spectral-edge grain-veil relative overflow-hidden rounded-[1.75rem]"

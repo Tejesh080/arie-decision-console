@@ -21,7 +21,9 @@ export default async function RootPage() {
 
   return (
     <>
-      <AppHeader />
+      {/* No header descriptor here: the hero's own "Signal Intelligence"
+          eyebrow sits a few lines below and says the same thing once. */}
+      <AppHeader showDescriptor={false} />
       <main id="content" className="relative z-0 flex-1">
         <MarketingHome authenticated={authenticated} />
       </main>

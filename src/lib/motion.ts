@@ -73,9 +73,15 @@ export const SPRING_TILT: Transition = {
   mass: 0.6,
 };
 
-/** Standard content entrance: a short rise + fade. Used by page sections. */
+/** Standard content entrance: a short rise, no fade. `hidden` keeps
+ * `opacity: 1` deliberately — this variant seeds the *server-rendered*
+ * initial state for primary content (page sections, headings, forms), so
+ * that state must be fully visible on its own. If Motion never hydrates —
+ * slow JS, a script error, a throttled tab — the reader still gets the
+ * content; they just miss the rise. Motion enhances arrival, it never
+ * creates visibility. */
 export const riseIn: Variants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 1, y: 12 },
   show: {
     opacity: 1,
     y: 0,
@@ -85,9 +91,10 @@ export const riseIn: Variants = {
 
 /** A heavier entrance for a scene rather than an element: rises further and
  * settles from slightly back, so a hero or a result set arrives instead of
- * simply appearing. */
+ * simply appearing. Same visibility guarantee as `riseIn`: `hidden` never
+ * hides. */
 export const arriveIn: Variants = {
-  hidden: { opacity: 0, y: 22, scale: 0.985 },
+  hidden: { opacity: 1, y: 22, scale: 0.985 },
   show: {
     opacity: 1,
     y: 0,
@@ -117,12 +124,12 @@ export const stagger = (gap = 0.055, delay = 0): Variants => ({
  * zero-duration finish: no mismatch, and no animation.
  */
 export const riseInStill: Variants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 1, y: 12 },
   show: { opacity: 1, y: 0, transition: { duration: 0 } },
 };
 
 export const arriveInStill: Variants = {
-  hidden: { opacity: 0, y: 22, scale: 0.985 },
+  hidden: { opacity: 1, y: 22, scale: 0.985 },
   show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
 };
 

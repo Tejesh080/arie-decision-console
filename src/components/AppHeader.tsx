@@ -50,7 +50,7 @@ const SECONDARY_NAV = [
   { href: "/settings", label: "Settings" },
 ] as const;
 
-export function AppHeader() {
+export function AppHeader({ showDescriptor = true }: { showDescriptor?: boolean } = {}) {
   const pathname = usePathname();
   const { scrollY } = useScroll();
   const [lifted, setLifted] = useState(false);
@@ -104,7 +104,7 @@ export function AppHeader() {
           aria-label="ARIE, back to overview"
           className="shrink-0 rounded-full py-1 pr-1"
         >
-          <Wordmark />
+          <Wordmark descriptor={showDescriptor} />
         </Link>
 
         <nav
