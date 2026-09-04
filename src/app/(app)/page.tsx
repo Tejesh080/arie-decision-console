@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { ArrowRight, MonitorSmartphone, Search } from "lucide-react";
@@ -28,6 +28,16 @@ export default function OverviewPage() {
   const mode = getDataMode();
   const router = useRouter();
   const reduced = useReducedMotion();
+
+  // `null` while `CustomerDashboard`'s fetch is still in flight (or hasn't
+  // been asked to run at all, in mock mode) — the marketing block stays
+  // hidden until we know for sure it's needed, so a signed-in customer never
+  // sees the pitch flash in before their real dashboard replaces it.
+  const [dashboardAvailable, setDashboardAvailable] = useState<boolean | null>(null);
+  const handleDashboardAvailable = useCallback((available: boolean) => {
+    setDashboardAvailable(available);
+  }, []);
+  const showMarketing = mode !== "api" || dashboardAvailable === false;
 
   // The hero settles back and dims as the next section arrives, so the page
   // reads as one camera move rather than two stacked screens.
@@ -103,14 +113,16 @@ export default function OverviewPage() {
 
   return (
     <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
-      {/* A real customer's own operational dashboard. Renders only in "api"
-          mode; everything in the marketing block below it is what a
-          signed-out or mock-mode visitor sees — a customer who already has
-          a dashboard doesn't need the pitch for the product they're
-          already using repeated underneath it. */}
-      {mode === "api" && <CustomerDashboard />}
+      {/* A real customer's own operational dashboard. Attempted only in
+          "api" mode; the marketing block below is what renders instead
+          once we know there's no dashboard to show — a signed-out visitor
+          on the public homepage, or (mock mode) a demo visitor who was
+          never going to have one. A signed-in customer with a real
+          dashboard never sees the pitch for the product they're already
+          using appear underneath it. */}
+      {mode === "api" && <CustomerDashboard onAvailable={handleDashboardAvailable} />}
 
-      {mode !== "api" && (
+      {showMarketing && (
         <>
           {/* ------------------------------------------------------ hero */}
           <motion.section

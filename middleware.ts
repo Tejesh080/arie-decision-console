@@ -25,6 +25,13 @@ import { NextResponse, type NextRequest } from "next/server";
  * `/signup` (Productization M6 Part 17) is the self-service account-creation
  * page — by definition reached before any session exists.
  *
+ * `/` is also let through signed-out: it's the public marketing homepage,
+ * not console UI. `(app)/page.tsx` renders the customer dashboard when a
+ * session resolves and the marketing page otherwise, so the same route
+ * serves both signed-in customers and anonymous visitors. `(app)/layout.tsx`
+ * mirrors this exemption — see its own comment for why reaching that layout
+ * unauthenticated is only possible on this one route.
+ *
  * A no-op entirely outside `api` data mode: "mock" mode is a fabricated,
  * client-side-only demo with no real backend and nothing to protect —
  * gating it behind a real Supabase login would break the zero-config
@@ -64,8 +71,9 @@ export async function middleware(request: NextRequest) {
   const onLoginPage = request.nextUrl.pathname === "/login";
   const onSignupPage = request.nextUrl.pathname === "/signup";
   const onInviteAcceptPage = request.nextUrl.pathname === "/invite/accept";
+  const onPublicHomePage = request.nextUrl.pathname === "/";
 
-  if (!user && !onLoginPage && !onSignupPage && !onInviteAcceptPage) {
+  if (!user && !onLoginPage && !onSignupPage && !onInviteAcceptPage && !onPublicHomePage) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

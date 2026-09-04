@@ -19,7 +19,15 @@ import { entrance, stagger } from "@/lib/motion";
  * "When I log in, what should I do?" — M7 Slice 7, Part H. One bounded
  * `GET /dashboard` call, no per-card fetch, no LLM anywhere on this page.
  */
-export function CustomerDashboard() {
+export function CustomerDashboard({
+  onAvailable,
+}: {
+  /** Told once the fetch resolves: `true` for a real signed-in customer with
+   * a dashboard to show, `false` for anyone else (signed out, no session,
+   * a transient error) — see this file's caller for why that distinction
+   * decides whether the marketing page renders alongside this component. */
+  onAvailable?: (available: boolean) => void;
+}) {
   const reduced = useReducedMotion();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
@@ -29,10 +37,16 @@ export function CustomerDashboard() {
     let cancelled = false;
     getDashboard()
       .then((result) => {
-        if (!cancelled) setSummary(result);
+        if (!cancelled) {
+          setSummary(result);
+          onAvailable?.(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          setError(true);
+          onAvailable?.(false);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -40,7 +54,7 @@ export function CustomerDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [onAvailable]);
 
   if (loading) {
     return (
