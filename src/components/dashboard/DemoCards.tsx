@@ -4,18 +4,25 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, CircleCheck, Eye, UserRoundCheck } from "lucide-react";
 import clsx from "clsx";
-import { DEMO_EXAMPLES, type DemoExample } from "@/lib/demoExamples";
+import { DEMO_EXAMPLES, type DemoExample, type DemoExampleId } from "@/lib/demoExamples";
+import type { DemoScenarioId } from "@/lib/demo/scenarios";
 import { REVEAL_VIEWPORT, entrance, stagger } from "@/lib/motion";
 import { pointerGlowLeave, pointerGlowMove } from "@/lib/pointerGlow";
 
 /**
  * The golden path.
  *
- * Human review and shadow mode are the two things about ARIE worth showing,
- * and both were previously reachable only by knowing which name to type
- * into a form. Each card runs its example directly, so a visitor who reads
- * nothing else still sees all three outcomes.
+ * Human review and shadow mode are the two things about ARIE worth showing.
+ * Each card deep-links into the matching tab of the permanently login-free
+ * `/demo` route (`src/app/demo/page.tsx`) — not `/leads/new?run=...`, which
+ * requires a session and would otherwise strand a signed-out visitor at the
+ * login wall.
  */
+const SCENARIO_FOR_EXAMPLE: Record<DemoExampleId, DemoScenarioId> = {
+  autonomous: "confident",
+  review: "review",
+  shadow: "shadow",
+};
 const ICON = {
   qualify: CircleCheck,
   human: UserRoundCheck,
@@ -64,7 +71,7 @@ function Card({ example }: { example: DemoExample }) {
   return (
     <motion.li variants={entrance(reduced)} className="min-w-0">
       <Link
-        href={`/leads/new?run=${example.id}`}
+        href={`/demo?scenario=${SCENARIO_FOR_EXAMPLE[example.id]}`}
         onPointerMove={pointerGlowMove}
         onPointerLeave={pointerGlowLeave}
         className={clsx(

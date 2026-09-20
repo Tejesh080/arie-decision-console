@@ -32,6 +32,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * It is never redirected away from and never rewritten — only `/overview`
  * and the rest of `(app)` require a session.
  *
+ * `/demo` is let through signed-out for the same reason as `/`: it's the
+ * permanently public, backend-free walkthrough (`src/app/demo/page.tsx`,
+ * also outside `(app)`) built so a visitor with no account — a hiring
+ * manager clicking "Watch a run" from the homepage, say — never hits this
+ * redirect. It renders three frozen decision receipts with no session, no
+ * cookies, and no `/api/arie/*` call, so there is nothing here for a login
+ * wall to protect.
+ *
  * A no-op entirely outside `api` data mode: "mock" mode is a fabricated,
  * client-side-only demo with no real backend and nothing to protect —
  * gating it behind a real Supabase login would break the zero-config
@@ -72,8 +80,16 @@ export async function middleware(request: NextRequest) {
   const onSignupPage = request.nextUrl.pathname === "/signup";
   const onInviteAcceptPage = request.nextUrl.pathname === "/invite/accept";
   const onPublicHomePage = request.nextUrl.pathname === "/";
+  const onDemoPage = request.nextUrl.pathname === "/demo";
 
-  if (!user && !onLoginPage && !onSignupPage && !onInviteAcceptPage && !onPublicHomePage) {
+  if (
+    !user &&
+    !onLoginPage &&
+    !onSignupPage &&
+    !onInviteAcceptPage &&
+    !onPublicHomePage &&
+    !onDemoPage
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

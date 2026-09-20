@@ -115,7 +115,7 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
               />
             </ButtonLink>
           )}
-          <ButtonLink href="/leads/new?run=autonomous" variant="secondary" size="lg">
+          <ButtonLink href="/demo" variant="secondary" size="lg">
             Watch a run
           </ButtonLink>
         </motion.div>
