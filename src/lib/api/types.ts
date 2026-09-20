@@ -147,11 +147,21 @@ export interface HealthResponse {
 
 // ------------------------------------------------------------- receipt --
 
+export type EvidenceSufficiency = "settled" | "insufficient_evidence";
+
 export interface ReceiptDecision {
   recommended_action: string;
   autonomous: boolean;
   final_status: LeadStatus;
   human_override: boolean;
+  /** Priority 1 hardening sprint (2026-09-21). Whether unresolved evidence
+   * (`score.bounds` still straddling a decision boundary) could still change
+   * `recommended_action`. Never render `recommended_action` alone as a
+   * definitive verdict without checking this first — a "reject" with
+   * `evidence_sufficiency: "insufficient_evidence"` means ARIE does not yet
+   * have enough information to conclude the lead is bad, not that it
+   * confidently is. */
+  evidence_sufficiency: EvidenceSufficiency;
 }
 
 export interface ReceiptScoreBounds {
@@ -291,6 +301,11 @@ export interface LeadRecommendationResponse {
   profile_version: number | null;
   shadow: boolean;
   execution_mode: string | null;
+  /** Priority 1 hardening sprint (2026-09-21). See `ReceiptDecision`'s own
+   * field of the same name. `null` only for a batch-list-derived signal that
+   * did not have bounds/thresholds to compute it from — never for a
+   * recommendation built from a full receipt. */
+  evidence_sufficiency: EvidenceSufficiency | null;
 }
 
 export interface EvidenceGroundedClaim {
@@ -603,6 +618,9 @@ export interface BatchRow {
   next_action: NextAction | null;
   short_reason: string | null;
   confidence_band: ConfidenceBand | null;
+  /** Priority 2 hardening sprint (2026-09-21). See `ReceiptDecision`'s field
+   * of the same name — `null` wherever `priority` is (no decision yet). */
+  evidence_sufficiency: EvidenceSufficiency | null;
 }
 
 export interface BatchRowsPage {

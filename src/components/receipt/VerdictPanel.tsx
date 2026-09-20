@@ -3,7 +3,7 @@
 import { Eye } from "lucide-react";
 import clsx from "clsx";
 import type { ReceiptResponse } from "@/lib/api/types";
-import { decisionLabel, decisionPastTense } from "@/lib/format/decision";
+import { decisionLabel, decisionPastTense, evidenceSufficiencyLabel } from "@/lib/format/decision";
 import { formatPercent, formatScore, formatUsdCompact, statusLabel } from "@/lib/format";
 import { costNounShort, costCaveat, isSimulated } from "@/lib/api/providerMode";
 import { Badge } from "@/components/ui/Badge";
@@ -30,6 +30,7 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
   const reviewResolved = escalated && !!receipt.human_review?.responded_at;
   const cleared = score.confidence >= score.tau;
   const gap = Math.abs(score.confidence - score.tau) * 100;
+  const insufficientEvidence = decision.evidence_sufficiency === "insufficient_evidence";
 
   const accent = shadow ? "shadow" : escalated ? "human" : "machine";
   const headline = shadow
@@ -107,14 +108,25 @@ export function VerdictPanel({ receipt }: { receipt: ReceiptResponse }) {
           </p>
         </div>
 
-        {shadow ? (
-          <Badge tone="shadow" variant="outline">
-            No routing action executed
-          </Badge>
-        ) : reviewResolved && decision.human_override ? (
-          <Badge tone="human">Human override</Badge>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {shadow && (
+            <Badge tone="shadow" variant="outline">
+              No routing action executed
+            </Badge>
+          )}
+          {reviewResolved && decision.human_override && <Badge tone="human">Human override</Badge>}
+          {insufficientEvidence && (
+            <Badge tone="pending">{evidenceSufficiencyLabel(decision.evidence_sufficiency)}</Badge>
+          )}
+        </div>
       </div>
+
+      {insufficientEvidence && (
+        <p className="mt-3 max-w-xl text-[0.8125rem] leading-relaxed text-text-dim">
+          Unresolved evidence could still change this recommendation — the reachable score range
+          still crosses a decision boundary. This is a provisional read, not a settled conclusion.
+        </p>
+      )}
 
       {/* Four numbers, each with what it means written underneath it. */}
       <dl className="mt-8 grid grid-cols-2 gap-x-5 gap-y-6 border-t border-border pt-6 sm:grid-cols-4">

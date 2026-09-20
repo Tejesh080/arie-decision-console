@@ -4,6 +4,7 @@ import {
   QUALIFIED_STATUSES,
   REJECTED_STATUSES,
   SHADOW_STATUSES,
+  type EvidenceSufficiency,
   type LeadStatus,
 } from "@/lib/api/types";
 import type { BadgeTone } from "@/components/ui/Badge";
@@ -33,6 +34,17 @@ const DECISION_PAST_TENSE: Record<string, string> = {
 
 export function decisionPastTense(decision: string): string {
   return DECISION_PAST_TENSE[decision] ?? decisionLabel(decision);
+}
+
+/**
+ * Priority 1 hardening sprint (2026-09-21). Whether `recommended_action`
+ * (whatever it is) could still change if the leftover unknown fields
+ * resolved differently. Never a replacement for `decisionLabel` — the two
+ * always render together, never one instead of the other — see
+ * `VerdictPanel`.
+ */
+export function evidenceSufficiencyLabel(sufficiency: EvidenceSufficiency): string {
+  return sufficiency === "insufficient_evidence" ? "Insufficient evidence" : "Evidence settled";
 }
 
 const REVIEW_ACTION_LABELS: Record<string, string> = {

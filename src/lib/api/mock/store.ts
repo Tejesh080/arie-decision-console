@@ -19,6 +19,7 @@ import type {
   CreateOrganizationResponse,
   CustomerPriority,
   DashboardSummary,
+  EvidenceSufficiency,
   ExecuteResearchRequest,
   FeedbackInsights,
   FeedbackResponse,
@@ -420,6 +421,26 @@ function isSettled(lead: MockLead, nowMs: number): boolean {
 // demo — never imported from a shared module, because the real rules live
 // once, on the backend; this is mock mode's own restatement, kept small.
 
+/**
+ * Priority 1 hardening sprint (2026-09-21). Mirrors
+ * `arie.scoring.rules.settled_decision`: whether the reachable score range
+ * (`bounds`) still straddles a decision boundary, given `threshold_qualify`/
+ * `threshold_reject`. Reused by both `deriveRecommendation` below and the
+ * research-plan mock's own `alreadyClear` check, so this file has exactly
+ * one restatement of the rule rather than two that could drift apart.
+ */
+function isBoundsSettled(
+  bounds: { lower: number; upper: number },
+  thresholdQualify: number,
+  thresholdReject: number,
+): boolean {
+  return (
+    bounds.lower >= thresholdQualify ||
+    bounds.upper < thresholdReject ||
+    (bounds.lower >= thresholdReject && bounds.upper < thresholdQualify)
+  );
+}
+
 const FIELD_LABELS: Record<string, string> = {
   employee_count: "company size",
   industry: "industry",
@@ -435,6 +456,16 @@ function deriveRecommendation(receipt: ReceiptResponse): LeadRecommendationRespo
     .filter((item) => item.field !== "disqualifying_flag")
     .map((item) => FIELD_LABELS[item.field] ?? item.field);
   const missing = receipt.evidence.unknown_fields.map((field) => FIELD_LABELS[field] ?? field);
+  const evidenceSufficiency: EvidenceSufficiency | null =
+    receipt.status === "decided" && receipt.score
+      ? isBoundsSettled(
+          receipt.score.bounds,
+          receipt.score.threshold_qualify,
+          receipt.score.threshold_reject,
+        )
+        ? "settled"
+        : "insufficient_evidence"
+      : null;
 
   let priority: CustomerPriority;
   if (receipt.status !== "decided") {
@@ -445,7 +476,11 @@ function deriveRecommendation(receipt: ReceiptResponse): LeadRecommendationRespo
   ) {
     priority = "review";
   } else if (REJECTED_STATUSES.includes(receipt.lead_status)) {
-    priority = "skip";
+    // Priority 1 hardening sprint (2026-09-21): a settled reject really is
+    // "skip" — but one whose reachable score range could still cross into
+    // qualifying territory is uncertainty, not a rejection, mirroring
+    // arie.recommendations.derive_customer_priority's identical rule.
+    priority = evidenceSufficiency === "insufficient_evidence" ? "review" : "skip";
   } else {
     const confidence = receipt.score?.confidence ?? 0;
     priority =
@@ -481,6 +516,13 @@ function deriveRecommendation(receipt: ReceiptResponse): LeadRecommendationRespo
     shortReason = "ARIE is still gathering evidence on this lead.";
   } else if (AWAITING_REVIEW_STATUSES.includes(receipt.lead_status)) {
     shortReason = "This lead is waiting on a human review before it can move forward.";
+  } else if (
+    REJECTED_STATUSES.includes(receipt.lead_status) &&
+    evidenceSufficiency === "insufficient_evidence"
+  ) {
+    shortReason =
+      "ARIE's evidence on this lead is incomplete — the outcome could still change with " +
+      "more information, even though the current recommendation is reject.";
   } else if (priority === "skip") {
     shortReason = "This lead falls outside your targeting profile.";
   } else {
@@ -522,6 +564,7 @@ function deriveRecommendation(receipt: ReceiptResponse): LeadRecommendationRespo
     profile_version: receipt.versions?.icp_profile_version ?? null,
     shadow: receipt.shadow,
     execution_mode: "simulated",
+    evidence_sufficiency: evidenceSufficiency,
   };
 }
 
@@ -577,10 +620,7 @@ function deriveResearchPlan(receipt: ReceiptResponse): ResearchPlanResponse {
     return refused("no_research_needed", "ARIE hasn't finished evaluating this lead yet.");
   }
   const { value, threshold_qualify, threshold_reject, bounds } = receipt.score;
-  const alreadyClear =
-    bounds.lower >= threshold_qualify ||
-    bounds.upper < threshold_reject ||
-    (bounds.lower >= threshold_reject && bounds.upper < threshold_qualify);
+  const alreadyClear = isBoundsSettled(bounds, threshold_qualify, threshold_reject);
   if (alreadyClear) {
     return refused(
       "decision_already_clear",
@@ -937,6 +977,13 @@ class MockArieStore {
         autonomous: lead.scenario.autonomous,
         final_status: finalStatus,
         human_override: humanOverride,
+        evidence_sufficiency: isBoundsSettled(
+          { lower: lead.scenario.score.lower, upper: lead.scenario.score.upper },
+          65.0,
+          55.0,
+        )
+          ? "settled"
+          : "insufficient_evidence",
       },
       score: {
         value: lead.scenario.score.value,
@@ -1475,6 +1522,7 @@ class MockArieStore {
         next_action: valid ? "contact_now" : null,
         short_reason: valid ? "Strong match based on your targeting profile." : null,
         confidence_band: valid ? "high" : null,
+        evidence_sufficiency: valid ? "settled" : null,
       };
     });
     const acceptedRows = records.filter((r) => r.validation_status === "accepted").length;

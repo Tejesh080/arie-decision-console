@@ -59,6 +59,19 @@ export function RecommendationPanel({
   const isPending = recommendation.score === null;
   const factualClaims = explanation?.claims.filter((c) => !c.hypothesis) ?? [];
   const hypotheses = explanation?.claims.filter((c) => c.hypothesis) ?? [];
+  // Priority 3 (2026-09-21): "review" already covers an open human review and
+  // a not-yet-decided lead, both correctly labelled "Review" — but a lead
+  // that landed here specifically because unresolved evidence still crosses
+  // a decision boundary (not because a human needs to weigh in on something
+  // ARIE is otherwise sure of) deserves its own, more specific word. Backend
+  // recommendation/priority is unchanged; this only picks a more precise
+  // label for the identical "review" value.
+  const needsMoreEvidence =
+    recommendation.priority === "review" &&
+    recommendation.evidence_sufficiency === "insufficient_evidence";
+  const priorityDisplayLabel = needsMoreEvidence
+    ? "Needs more evidence"
+    : priorityLabel(recommendation.priority);
 
   return (
     <Panel accent={PRIORITY_ACCENT[recommendation.priority]} padding="lg">
@@ -66,9 +79,7 @@ export function RecommendationPanel({
         <div>
           <Eyebrow>ARIE recommends</Eyebrow>
           <div className="mt-1.5">
-            <Badge tone={priorityTone(recommendation.priority)}>
-              {priorityLabel(recommendation.priority)}
-            </Badge>
+            <Badge tone={priorityTone(recommendation.priority)}>{priorityDisplayLabel}</Badge>
           </div>
         </div>
         {recommendation.confidence_band && (

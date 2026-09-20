@@ -23,6 +23,7 @@ function makeReceipt(overrides: Partial<ReceiptResponse> = {}): ReceiptResponse 
       autonomous: false,
       final_status: "AWAITING_HUMAN",
       human_override: false,
+      evidence_sufficiency: "settled",
     },
     score: {
       value: 51,
@@ -196,6 +197,7 @@ describe("HumanReviewPanel — resolved review", () => {
             autonomous: false,
             final_status: "AUTO_ROUTED",
             human_override: true,
+            evidence_sufficiency: "settled",
           },
         })}
         onDecided={vi.fn()}
@@ -228,6 +230,7 @@ describe("HumanReviewPanel — resolved review", () => {
             autonomous: false,
             final_status: "SYNCED",
             human_override: false,
+            evidence_sufficiency: "settled",
           },
         })}
         onDecided={vi.fn()}
