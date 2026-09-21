@@ -121,7 +121,7 @@ function Card({ example }: { example: DemoExample }) {
         <p className="mt-3.5 text-[0.9375rem] leading-relaxed text-text-dim">{example.blurb}</p>
 
         <span className="mt-auto flex items-center gap-1.5 pt-8 text-sm font-medium text-text">
-          Run this example
+          See this outcome
           <ArrowRight
             aria-hidden
             className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1"
@@ -137,7 +137,7 @@ function Card({ example }: { example: DemoExample }) {
  * start so the console reads as a demonstration rather than a tool they are
  * expected to already know how to drive. */
 export function DemoSteps() {
-  const steps = ["Pick an example", "Watch it gather", "See it stop", "Read the reasoning"];
+  const steps = ["Pick an outcome", "See the evidence", "See where it stopped", "Read the reasoning"];
   return (
     <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
       {steps.map((step, i) => (

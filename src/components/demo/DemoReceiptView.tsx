@@ -91,26 +91,28 @@ export function DemoReceiptView({ scenario }: { scenario: DemoScenario }) {
         <div className="mt-4 flex flex-col gap-5">
           <VerdictPanel receipt={receipt} />
 
+          {/* Bounds sit with the score they bound, immediately after the
+              verdict's own numbers and before "why ARIE stopped". */}
+          <Panel as="section">
+            <Eyebrow>Scoring</Eyebrow>
+            <h2 className="t-h3 mt-1.5 text-text">Where the score landed</h2>
+            <div className="mt-5">
+              {receipt.score && (
+                <ScoreBand
+                  value={receipt.score.value}
+                  lower={receipt.score.bounds.lower}
+                  upper={receipt.score.bounds.upper}
+                  thresholdReject={receipt.score.threshold_reject}
+                  thresholdQualify={receipt.score.threshold_qualify}
+                />
+              )}
+            </div>
+          </Panel>
+
           <StopFlow receipt={receipt} />
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
             <div className="flex min-w-0 flex-col gap-5">
-              <Panel as="section">
-                <Eyebrow>Scoring</Eyebrow>
-                <h2 className="t-h3 mt-1.5 text-text">Where the score landed</h2>
-                <div className="mt-5">
-                  {receipt.score && (
-                    <ScoreBand
-                      value={receipt.score.value}
-                      lower={receipt.score.bounds.lower}
-                      upper={receipt.score.bounds.upper}
-                      thresholdReject={receipt.score.threshold_reject}
-                      thresholdQualify={receipt.score.threshold_qualify}
-                    />
-                  )}
-                </div>
-              </Panel>
-
               <details className="group/evidence">
                 <summary className="surface-flat flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 transition-colors hover:border-border-loud">
                   <span className="min-w-0">

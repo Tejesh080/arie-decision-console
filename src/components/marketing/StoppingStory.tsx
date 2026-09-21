@@ -6,46 +6,46 @@ import clsx from "clsx";
 import { REVEAL_VIEWPORT, entrance, stagger } from "@/lib/motion";
 
 /**
- * What ARIE actually does, in the order it does it.
+ * What ARIE actually does to a single lead, in the order it does it.
  *
- * These four stages are the funnel the backend really reports
- * (`DiscoveryFunnel`: search_queries → screened → website_verified →
- * buyer_found) — a description of the machine, not a marketing abstraction
- * of it. The one liberty taken is colour: each stage is tinted along the
- * app's own signal spectrum, violet through to mint, so the sequence reads
- * as the brand's whole story — noise resolving into signal — without
- * needing another diagram to say so.
+ * These four stages are the real stopping policy (`arie.policy` /
+ * `_acquire_live_evidence`: buy cheapest-first, check `is_settled`, check
+ * confidence against tau, otherwise buy the next one) — a description of
+ * the machine, not a marketing abstraction of it. Colour and layout are
+ * lifted directly from `FunnelStory` (the discovery-funnel version of this
+ * same component) so the two tell visually-consistent stories; this one is
+ * the primary narrative, that one is now secondary.
  */
 const STAGES = [
   {
     n: "01",
-    title: "Search the market",
-    body: "ARIE turns your targeting profile into real search queries and pulls back the companies that match — not a static list someone sold you.",
-    glyph: "search",
+    title: "Buy the cheapest evidence first",
+    body: "Company firmographics before a per-person lookup, cache before a fresh call — the same identity resolved twice never pays twice.",
+    glyph: "buy",
     tone: "#9e86ff",
     dim: "rgba(158,134,255,0.14)",
   },
   {
     n: "02",
-    title: "Screen before spending",
-    body: "Every candidate gets judged cheaply first. The ones that clearly don't fit are dropped before a single paid lookup happens.",
-    glyph: "screen",
+    title: "Ask if anything left could still change it",
+    body: "Given what's unknown, could the best or worst case of the next purchase actually move the outcome? If not, no amount of extra evidence is worth paying for.",
+    glyph: "settle",
     tone: "#6c8cff",
     dim: "rgba(108,140,255,0.14)",
   },
   {
     n: "03",
-    title: "Verify on their own site",
-    body: "The survivors get checked against what the company says about itself, so the reason to contact them is grounded in evidence you can read.",
-    glyph: "verify",
+    title: "Stop when confidence clears the bar",
+    body: "A calibrated model, not a guess — checked against an autonomy threshold derived from a statistical bound, not the raw pass rate on a small sample.",
+    glyph: "threshold",
     tone: "#59d8ff",
     dim: "rgba(89,216,255,0.14)",
   },
   {
     n: "04",
-    title: "Name the person",
-    body: "Then ARIE finds who owns that problem, and tells you what to do next — or says plainly that it couldn't.",
-    glyph: "person",
+    title: "Route it, or ask a person",
+    body: "Confident enough, ARIE acts alone. Short of the bar, it stops and hands the lead to a reviewer instead of guessing — either way, a receipt records exactly why.",
+    glyph: "route",
     tone: "#4fe3c1",
     dim: "rgba(79,227,193,0.16)",
     accent: true,
@@ -55,71 +55,52 @@ const STAGES = [
 function Glyph({ kind, tone }: { kind: string; tone: string }) {
   return (
     <svg viewBox="0 0 40 40" fill="none" aria-hidden className="h-8 w-8 sm:h-9 sm:w-9">
-      {kind === "search" && (
+      {kind === "buy" && (
         <>
-          {[6, 14, 22, 30].map((x) => (
-            <rect key={x} x={x} y="17" width="4" height="4" rx="1" fill={tone} opacity={0.85} />
+          <circle cx="14" cy="14" r="7" stroke={tone} strokeWidth="1.6" opacity={0.9} />
+          <circle cx="14" cy="14" r="2" fill={tone} opacity={0.85} />
+          {[22, 27, 32].map((x, i) => (
+            <circle key={x} cx={x} cy={26} r="4.5" stroke={tone} strokeWidth="1.4" opacity={0.4 - i * 0.08} />
           ))}
-          <rect x="6" y="9" width="4" height="4" rx="1" fill={tone} opacity={0.4} />
-          <rect x="22" y="25" width="4" height="4" rx="1" fill={tone} opacity={0.4} />
-          <rect x="30" y="9" width="4" height="4" rx="1" fill={tone} opacity={0.4} />
         </>
       )}
-      {kind === "screen" && (
+      {kind === "settle" && (
         <>
-          <rect x="6" y="17" width="4" height="4" rx="1" fill={tone} opacity={0.85} />
-          <rect x="14" y="17" width="4" height="4" rx="1" fill={tone} opacity={0.3} />
-          <rect x="22" y="17" width="4" height="4" rx="1" fill={tone} opacity={0.85} />
-          <rect x="30" y="17" width="4" height="4" rx="1" fill={tone} opacity={0.3} />
-          <path d="M20 6v28" stroke={tone} strokeWidth="1.25" strokeDasharray="3 4" opacity={0.6} />
+          <path d="M8 30V16l12-10 12 10v14" stroke={tone} strokeWidth="1.5" opacity={0.5} strokeLinejoin="round" />
+          <path d="M14 30v-9h12v9" stroke={tone} strokeWidth="1.6" opacity={0.9} strokeLinejoin="round" />
+          <circle cx="20" cy="12" r="2.4" fill={tone} opacity={0.9} />
         </>
       )}
-      {kind === "verify" && (
+      {kind === "threshold" && (
         <>
+          <path d="M6 30h28" stroke={tone} strokeWidth="1.4" opacity={0.35} strokeLinecap="round" />
+          <path d="M6 30V13" stroke={tone} strokeWidth="1.6" opacity={0.85} strokeLinecap="round" />
           <path
-            d="M8 12h14M8 19h10M8 26h16"
-            stroke={tone}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            opacity={0.6}
-          />
-          <circle cx="30" cy="26" r="6" stroke={tone} strokeWidth="1.5" opacity={0.85} />
-          <path
-            d="M27.5 26l2 2 3.5-4"
-            stroke={tone}
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.9}
-          />
-        </>
-      )}
-      {kind === "person" && (
-        <>
-          <circle cx="20" cy="15" r="5.5" stroke={tone} strokeWidth="1.6" opacity={0.9} />
-          <path
-            d="M9 32c1.8-5.6 6-8.4 11-8.4S29.2 26.4 31 32"
+            d="M6 22c4-9 9-13 14-13s10 4 14 13"
             stroke={tone}
             strokeWidth="1.6"
             strokeLinecap="round"
             opacity={0.9}
           />
+          <path d="M23 6v9" stroke={tone} strokeWidth="1.4" strokeDasharray="2.5 3" opacity={0.6} />
+        </>
+      )}
+      {kind === "route" && (
+        <>
+          <circle cx="10" cy="20" r="4" stroke={tone} strokeWidth="1.6" opacity={0.85} />
+          <path d="M14 20h9" stroke={tone} strokeWidth="1.6" opacity={0.7} strokeLinecap="round" />
+          <path d="M27 13l6 7-6 7" stroke={tone} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
         </>
       )}
     </svg>
   );
 }
 
-export function FunnelStory() {
+export function StoppingStory() {
   const reduced = useReducedMotion();
   const variants = entrance(reduced);
   const railRef = useRef<HTMLDivElement>(null);
 
-  // The rail fills with colour as the reader scrolls the sequence — the
-  // same "resolving" idea the hero's typography plays with, played out
-  // spatially instead. `useScroll` reads real scroll position; it is never
-  // driven by a timer, so nothing here fakes progress the reader hasn't
-  // actually made.
   const { scrollYProgress } = useScroll({
     target: railRef,
     offset: ["start 0.8", "end 0.55"],
@@ -128,9 +109,6 @@ export function FunnelStory() {
 
   return (
     <div ref={railRef} className="relative mt-20">
-      {/* A wide, low wash behind the whole sequence — the section's own
-          light, distinct from the hero's but built the same cheap way
-          (radial-gradient, no filter). */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-[-4vw] top-0 -z-10 h-full opacity-70"
@@ -149,14 +127,10 @@ export function FunnelStory() {
         viewport={REVEAL_VIEWPORT}
         className="relative flex flex-col"
       >
-        {/* Base rail — always visible, quiet. */}
         <span
           aria-hidden
           className="absolute top-2 bottom-2 left-[23px] w-px bg-border-strong sm:left-[31px]"
         />
-        {/* Fill rail — grows with real scroll progress, transform-origin
-            pinned to the top so it reads as light travelling down the
-            sequence rather than a bar just appearing. */}
         <motion.span
           aria-hidden
           style={{ scaleY: fill, transformOrigin: "top" }}
@@ -180,9 +154,6 @@ export function FunnelStory() {
               variants={variants}
               className="group relative flex gap-6 py-10 sm:gap-9 sm:py-14"
             >
-              {/* Ghost numeral — the bespoke editorial flourish repeated
-                  from the hero, at ambient scale, never competing with the
-                  real content in front of it. */}
               <span
                 aria-hidden
                 className="t-editorial pointer-events-none absolute top-1/2 right-0 -z-10 hidden -translate-y-1/2 text-[7rem] leading-none text-transparent select-none sm:block lg:text-[9rem]"

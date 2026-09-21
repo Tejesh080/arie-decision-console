@@ -28,12 +28,9 @@ import { SignOutButton } from "./SignOutButton";
  */
 const PRIMARY_NAV = [
   { href: "/overview", label: "Overview" },
-  // The primary surface: "tell me what you sell and I'll find the companies
-  // worth your attention." Placed first, ahead of the CSV-first workflow it
-  // demotes but doesn't remove.
   { href: "/discover", label: "Find customers" },
   { href: "/leads/new", label: "New lead" },
-  { href: "/batches", label: "History" },
+  { href: "/batches", label: "Batches" },
   { href: "/ask", label: "Ask ARIE" },
 ] as const;
 

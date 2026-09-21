@@ -11,6 +11,7 @@ import {
   priorityTone,
   researchStatusLabel,
 } from "@/lib/format/recommendation";
+import { decisionLabel, evidenceSufficiencyLabel } from "@/lib/format/decision";
 import { Badge } from "@/components/ui/Badge";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
 import { Button } from "@/components/ui/Button";
@@ -81,6 +82,31 @@ export function RecommendationPanel({
           <div className="mt-1.5">
             <Badge tone={priorityTone(recommendation.priority)}>{priorityDisplayLabel}</Badge>
           </div>
+          {/* This customer-facing priority is a derived read, never the raw
+              machine call — the two must stay visibly separate rather than
+              collapsing into one badge (see VerdictPanel's identical pairing
+              in the Decision Receipt below). A "Needs more evidence" priority
+              sitting on top of a raw "Reject" is the whole point of the
+              evidence_sufficiency hardening: the badge above is what to do
+              next, this line is what ARIE actually concluded and how sure it
+              was of the evidence behind that. */}
+          {recommendation.machine_decision && (
+            <p className="mt-2 text-[0.75rem] leading-relaxed text-text-faint">
+              Machine recommendation{" "}
+              <span className="font-medium text-text-dim">
+                {decisionLabel(recommendation.machine_decision)}
+              </span>
+              {recommendation.evidence_sufficiency && (
+                <>
+                  {" "}
+                  · Evidence{" "}
+                  <span className="font-medium text-text-dim">
+                    {evidenceSufficiencyLabel(recommendation.evidence_sufficiency)}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
         </div>
         {recommendation.confidence_band && (
           <div className="text-right">

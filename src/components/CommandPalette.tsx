@@ -66,8 +66,8 @@ const COMMANDS: Command[] = [
   },
   {
     href: "/batches",
-    label: "History",
-    hint: "Past runs and uploaded batches",
+    label: "Batches",
+    hint: "Bulk upload, and past runs and batches",
     group: "Do",
     keywords: "batches history runs past uploads",
     icon: FileStack,

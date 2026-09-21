@@ -4,7 +4,7 @@ The frontend for the [Adaptive Revenue Intelligence Engine](https://github.com/T
 
 Next.js 16 (App Router) + TypeScript + Tailwind CSS v4. No CRM UI, no real enrichment providers — see [Non-goals](#non-goals). Supabase authentication gates the app in "api" mode only — see [Authentication](#authentication).
 
-**[Live demo](https://arie-web.vercel.app/)** — hosted on Vercel, talking to the real hosted backend (Railway + Supabase) through this app's own server-side proxy. See [Deploy to Vercel](#deploy-to-vercel) below for how it's configured.
+**[Try the console — no account needed](https://arie-web.vercel.app/demo)**. `/demo` is a permanently public, backend-free route: three frozen decision receipts (confident auto-route, insufficient evidence sent to review, shadow evaluation), rendered through the exact same components a signed-in customer sees, with no session, no provider call, and nothing ever billed — clearly labelled as simulated on the page itself. Everything else under `/overview`, `/leads/new`, etc. requires a real Supabase sign-in against the [Live app](https://arie-web.vercel.app/), which talks to the real hosted backend (Railway + Supabase) through this app's own server-side proxy. See [Deploy to Vercel](#deploy-to-vercel) below for how it's configured.
 
 ---
 
@@ -101,6 +101,8 @@ With no Stripe credentials configured on the backend, none of this breaks — `/
 
 The clearest way to see the whole product thesis — a machine recommendation that isn't automatically actionable, and a human decision that becomes the record of what actually happened without erasing what the machine said.
 
+**No account? [`/demo`](https://arie-web.vercel.app/demo?scenario=review) shows this exact scenario already resolved**, with no sign-in and no setup — the "Insufficient evidence" tab. The walkthrough below is for a signed-in session (either mode above), where you drive the review yourself:
+
 1. Start either mode above.
 2. Go to **New lead**, click the **Nadia Haddad — human escalation** preset, and submit.
 3. ARIE evaluates all 8 providers and still can't clear its autonomy threshold — the receipt shows the machine's recommendation (**Reject**), why it isn't autonomous, and a **Human review required** panel.
@@ -181,7 +183,9 @@ All confirmed against the backend's own source (`src/arie/api/schemas.py`, `src/
 
 ## Screenshots
 
-`npm run test:e2e -- e2e/screenshots.spec.ts` captures every key state at 1440 / 1280 / 390 px into `screenshots/` (gitignored). It creates the four receipt states once through the app's own proxy, then photographs each at every breakpoint — so a screenshot can never show a layout the app cannot actually produce.
+`npm run test:e2e -- e2e/screenshots.spec.ts` captures every key authenticated state at 1440 / 1280 / 390 px into `screenshots/` (gitignored). It creates the four receipt states once through the app's own proxy, then photographs each at every breakpoint — so a screenshot can never show a layout the app cannot actually produce.
+
+`e2e/demo-screenshots.spec.ts` and `e2e/portfolio-screenshots.spec.ts` do the same for `/demo`'s three scenarios, Ask ARIE, and Find Customers — each a small, independent spec (no shared `beforeAll`) since none of those three need the fixture setup the first file's authenticated states do.
 
 ---
 

@@ -6,6 +6,7 @@ import {
   priorityTone,
   researchStatusLabel,
 } from "@/lib/format/recommendation";
+import { decisionLabel, evidenceSufficiencyLabel } from "@/lib/format/decision";
 import { Badge } from "@/components/ui/Badge";
 import { Panel, Eyebrow } from "@/components/ui/Panel";
 
@@ -53,6 +54,26 @@ export function DemoRecommendationSummary({
           <div className="mt-1.5">
             <Badge tone={priorityTone(recommendation.priority)}>{priorityDisplayLabel}</Badge>
           </div>
+          {/* Raw machine call and evidence sufficiency, kept visibly separate
+              from the derived customer-facing priority above — never one
+              ambiguous badge. See RecommendationPanel's identical pairing. */}
+          {recommendation.machine_decision && (
+            <p className="mt-2 text-[0.75rem] leading-relaxed text-text-faint">
+              Machine recommendation{" "}
+              <span className="font-medium text-text-dim">
+                {decisionLabel(recommendation.machine_decision)}
+              </span>
+              {recommendation.evidence_sufficiency && (
+                <>
+                  {" "}
+                  · Evidence{" "}
+                  <span className="font-medium text-text-dim">
+                    {evidenceSufficiencyLabel(recommendation.evidence_sufficiency)}
+                  </span>
+                </>
+              )}
+            </p>
+          )}
         </div>
         {recommendation.confidence_band && (
           <div className="text-right">

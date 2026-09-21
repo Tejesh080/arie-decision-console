@@ -2,17 +2,19 @@
 
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ExternalLink, Search } from "lucide-react";
 import { getDataMode } from "@/lib/api/mode";
 import { Eyebrow } from "@/components/ui/Panel";
 import { ButtonLink } from "@/components/ui/Button";
 import { Mark } from "@/components/brand/Mark";
 import { HeroAurora } from "@/components/graphics/HeroAurora";
-import { ProductFrame } from "@/components/graphics/ProductFrame";
+import { ReceiptFrame } from "@/components/graphics/ReceiptFrame";
 import { AnimatedGridPattern } from "@/components/graphics/AnimatedGridPattern";
-import { FunnelStory } from "@/components/marketing/FunnelStory";
+import { StoppingStory } from "@/components/marketing/StoppingStory";
 import { DemoCards, DemoSteps } from "@/components/dashboard/DemoCards";
 import { REVEAL_VIEWPORT, arrival, entrance, stagger } from "@/lib/motion";
+
+const GITHUB_URL = "https://github.com/Tejesh080/arie-b2b-enrichment-engine";
 
 /**
  * The public marketing homepage — everything at `/`, for every visitor,
@@ -59,7 +61,7 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
         <motion.div variants={variants}>
           <span className="liquid-surface liquid-edge inline-flex items-center gap-2.5 rounded-full py-1.5 pr-4 pl-2">
             <Mark className="h-4 w-4 text-qualify" />
-            <span className="t-sys text-text-dim">Signal Intelligence</span>
+            <span className="t-sys text-text-dim">Decision Intelligence</span>
           </span>
         </motion.div>
 
@@ -67,25 +69,27 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
           variants={arrive}
           className="t-editorial mt-8 max-w-[52rem] text-[clamp(2.6rem,1.3rem+4.6vw,4.75rem)] leading-[1.04] text-balance text-text"
         >
-          Most of the market is <span className="t-noise">noise.</span> ARIE finds the{" "}
+          Most tools buy <span className="t-noise">every lead</span> the same way. ARIE knows
+          when to{" "}
           <span className="signal-word align-baseline">
             <span aria-hidden className="signal-word__halo">
-              signal.
+              stop.
             </span>
             <span aria-hidden className="signal-word__core">
-              signal.
+              stop.
             </span>
             <span aria-hidden className="signal-word__stroke">
-              signal.
+              stop.
             </span>
-            <span className="sr-only">signal.</span>
+            <span className="sr-only">stop.</span>
           </span>
         </motion.h1>
 
         <motion.p variants={variants} className="t-lead mt-7 max-w-[34rem] text-pretty">
-          Tell it what you sell. ARIE watches the market for the moment a company has a real
-          reason to care, verifies what it finds on their own site, and names the person who owns
-          the problem — evidence attached.
+          Enrichment pipelines call every provider on every lead, then score whatever comes back.
+          ARIE buys the cheapest evidence first, keeps buying only while the answer could still
+          change, and stops the moment it&apos;s confident enough to decide — or asks a person when
+          it isn&apos;t. Every decision ships with a receipt showing exactly why.
         </motion.p>
 
         {/* No Motion wrapper around these: `whileHover` makes Motion add
@@ -98,36 +102,27 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
           variants={variants}
           className="mt-9 flex flex-wrap items-center justify-center gap-3.5"
         >
-          {authenticated ? (
-            <ButtonLink href="/overview" variant="primary" size="lg">
-              Open ARIE
-              <ArrowRight
-                className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-0.5"
-                strokeWidth={2.5}
-              />
-            </ButtonLink>
-          ) : (
-            <ButtonLink href="/discover" variant="primary" size="lg">
-              Find customers
-              <ArrowRight
-                className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-0.5"
-                strokeWidth={2.5}
-              />
-            </ButtonLink>
-          )}
-          <ButtonLink href="/demo" variant="secondary" size="lg">
-            Watch a run
+          <ButtonLink href={authenticated ? "/overview" : "/demo"} variant="primary" size="lg">
+            {authenticated ? "Open ARIE" : "Explore interactive demo"}
+            <ArrowRight
+              className="h-4 w-4 transition-transform duration-300 group-hover/btn:translate-x-0.5"
+              strokeWidth={2.5}
+            />
+          </ButtonLink>
+          <ButtonLink href={GITHUB_URL} variant="secondary" size="lg">
+            View on GitHub
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.25} />
           </ButtonLink>
         </motion.div>
 
-        {mode === "mock" && (
-          <motion.p variants={variants} className="mt-5 text-[0.8125rem] text-text-faint">
-            You&apos;re in demo mode — everything works, nothing is billed.
-          </motion.p>
-        )}
+        <motion.p variants={variants} className="mt-5 text-[0.8125rem] text-text-faint">
+          {mode === "mock"
+            ? "You're in demo mode — everything works, nothing is billed."
+            : "No account needed. Simulated providers, modelled cost — clearly labelled throughout."}
+        </motion.p>
 
         <motion.div variants={arrive} className="mt-16 w-full sm:mt-20">
-          <ProductFrame />
+          <ReceiptFrame />
         </motion.div>
       </motion.section>
 
@@ -165,12 +160,12 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
             Four steps, and it stops as soon as the answer can&apos;t change.
           </h2>
           <p className="mt-4 text-[1.0313rem] leading-relaxed text-text-dim">
-            Most of the market never costs you anything. ARIE only spends real research on the
-            companies that survive its own screen — and shows you the reasoning either way.
+            Evidence has a price and a decision has a deadline. ARIE spends only while spending is
+            still doing work — and shows the reasoning either way.
           </p>
         </motion.div>
 
-        <FunnelStory />
+        <StoppingStory />
       </section>
 
       {/* -------------------------------------------------------- see it run */}
@@ -184,9 +179,9 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
         >
           <div className="max-w-xl">
             <Eyebrow>See it run</Eyebrow>
-            <h2 className="t-h2 mt-3 text-balance text-text">Three outcomes, live.</h2>
+            <h2 className="t-h2 mt-3 text-balance text-text">Three outcomes, no sign-in.</h2>
             <p className="mt-4 text-[1.0313rem] leading-relaxed text-text-dim">
-              Each example runs against the real backend and ends on the full reasoning —
+              Frozen sample data, the real receipt components, and the full reasoning either way —
               including the one where ARIE decides it shouldn&apos;t act alone.
             </p>
           </div>
@@ -197,6 +192,38 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
           <DemoCards />
         </div>
       </section>
+
+      {/* ---------------------------------------------- secondary capability */}
+      <motion.section
+        variants={variants}
+        initial="hidden"
+        whileInView="show"
+        viewport={REVEAL_VIEWPORT}
+        className="border-t border-white/[0.05] py-20 sm:py-24"
+      >
+        <div className="liquid-surface liquid-edge flex flex-col items-start justify-between gap-6 rounded-[1.75rem] p-7 sm:flex-row sm:items-center sm:p-9">
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-machine-dim text-machine ring-1 ring-machine-edge/60 ring-inset">
+              <Search aria-hidden className="h-5 w-5" strokeWidth={2} />
+            </span>
+            <div className="max-w-lg">
+              <p className="t-sys text-text-faint">Also built in</p>
+              <h3 className="mt-1 text-[1.1875rem] font-semibold tracking-[-0.02em] text-text">
+                ARIE can also find who to call
+              </h3>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed text-text-dim">
+                The same evidence discipline pointed upstream: describe who you sell to, and ARIE
+                screens the market before it spends a cent, verifying each survivor against its
+                own website rather than a purchased list.
+              </p>
+            </div>
+          </div>
+          <ButtonLink href="/discover" variant="secondary" size="md" className="shrink-0">
+            Find customers
+            <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} />
+          </ButtonLink>
+        </div>
+      </motion.section>
 
       {/* ------------------------------------------------------- pull quote */}
       <section className="relative overflow-hidden border-t border-white/[0.05] py-28 text-center sm:py-36">
@@ -215,18 +242,18 @@ export function MarketingHome({ authenticated }: { authenticated: boolean }) {
           viewport={REVEAL_VIEWPORT}
           className="t-editorial mx-auto max-w-[46rem] text-[clamp(1.9rem,1.1rem+2.6vw,3.4rem)] leading-[1.12] text-balance text-text"
         >
-          Most tools tell you who might buy. ARIE tells you who&apos;s{" "}
+          Most tools ask which provider to call next. ARIE asks whether to{" "}
           <span className="signal-word align-baseline">
             <span aria-hidden className="signal-word__halo">
-              ready.
+              call at all.
             </span>
             <span aria-hidden className="signal-word__core">
-              ready.
+              call at all.
             </span>
             <span aria-hidden className="signal-word__stroke">
-              ready.
+              call at all.
             </span>
-            <span className="sr-only">ready.</span>
+            <span className="sr-only">call at all.</span>
           </span>
         </motion.p>
       </section>
