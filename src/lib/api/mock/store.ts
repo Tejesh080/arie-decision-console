@@ -2082,12 +2082,15 @@ class MockArieStore {
       leads_used: usage.leads_processed,
       leads_limit: this.limits.maxLeadsPerMonth,
       leads_remaining: Math.max(0, this.limits.maxLeadsPerMonth - usage.leads_processed),
-      modeled_spend_used_usd: usage.total_cost_usd,
-      modeled_spend_limit_usd: this.limits.maxModeledSpendUsdPerMonth,
-      modeled_spend_remaining_usd: Math.max(
-        0,
-        this.limits.maxModeledSpendUsdPerMonth - usage.total_cost_usd,
-      ),
+      // Mock mode runs entirely on simulated pricing, so every figure here is
+      // modelled: nothing was billed and no live service was called, which
+      // means none of it consumes the live allowance either.
+      estimated_live_spend_used_usd: 0,
+      estimated_live_spend_limit_usd: this.limits.maxModeledSpendUsdPerMonth,
+      estimated_live_spend_remaining_usd: this.limits.maxModeledSpendUsdPerMonth,
+      actual_spend_usd: 0,
+      estimated_live_cost_usd: 0,
+      modelled_spend_usd: usage.total_cost_usd,
       max_csv_rows_per_upload: this.limits.maxCsvRowsPerUpload,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),

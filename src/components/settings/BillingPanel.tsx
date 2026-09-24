@@ -174,7 +174,7 @@ export function BillingPanel({ canEdit }: { canEdit: boolean }) {
           <Stat label="Leads / month" value={entitlements.max_leads_per_month} />
           <Stat label="Max CSV rows / upload" value={entitlements.max_csv_rows_per_upload} />
           <Stat
-            label="Modeled spend / month"
+            label="Live usage allowance / month"
             value={formatUsd(entitlements.max_modeled_spend_usd_per_month, 2)}
           />
           <Stat label="Team members" value={entitlements.max_members} />

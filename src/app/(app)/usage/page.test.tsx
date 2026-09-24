@@ -35,9 +35,12 @@ function makeLimits(
     leads_used: 10,
     leads_limit: 5000,
     leads_remaining: 4990,
-    modeled_spend_used_usd: 1.6,
-    modeled_spend_limit_usd: 50,
-    modeled_spend_remaining_usd: 48.4,
+    estimated_live_spend_used_usd: 1.6,
+    estimated_live_spend_limit_usd: 50,
+    estimated_live_spend_remaining_usd: 48.4,
+    actual_spend_usd: 0,
+    estimated_live_cost_usd: 1.6,
+    modelled_spend_usd: 42.5,
     max_csv_rows_per_upload: 200,
     period_start: "2026-01-01T00:00:00Z",
     period_end: "2026-02-01T00:00:00Z",
@@ -54,7 +57,7 @@ describe("UsagePage — limits panel", () => {
     getUsageAgainstLimitsMock.mockReset();
   });
 
-  it("shows leads used/remaining and modeled spend against configured limits", async () => {
+  it("keeps billed, live and modelled cost apart, and gates on live usage", async () => {
     getUsageMock.mockResolvedValue(makeUsage());
     getUsageAgainstLimitsMock.mockResolvedValue(makeLimits());
 
@@ -62,8 +65,20 @@ describe("UsagePage — limits panel", () => {
     await waitFor(() => expect(screen.getByText("Monthly limits")).toBeInTheDocument());
 
     expect(screen.getByText("4990")).toBeInTheDocument();
-    expect(screen.getByText("$1.60")).toBeInTheDocument();
     expect(screen.getByText("200")).toBeInTheDocument();
+
+    // Three concepts, three figures, never added together. $1.60 appears
+    // twice on purpose: once as the allowance's own "used", once in the
+    // breakdown beside the other two kinds.
+    expect(screen.getAllByText("$1.60")).toHaveLength(2);
+    expect(screen.getByText("Actual billed")).toBeInTheDocument();
+    expect(screen.getByText("$0.00")).toBeInTheDocument();
+    expect(screen.getByText("Modelled / simulated")).toBeInTheDocument();
+    expect(screen.getByText("$42.50")).toBeInTheDocument();
+
+    // $42.50 of modelled cost against a $50 ceiling must NOT read as a
+    // quota warning -- that banner is what the old `modeled_spend_*` triple
+    // produced from fictional catalogue prices.
     expect(screen.queryByText(/reached its monthly quota/i)).not.toBeInTheDocument();
   });
 

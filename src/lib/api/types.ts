@@ -832,17 +832,35 @@ export interface OnboardingStatusResponse {
 
 // --------------------------------------------------------------- limits --
 //
-// Mirrors `arie.api.schemas.UsageAgainstLimitsResponse`. `modeled_spend_*`
-// fields are real ledger arithmetic over configured provider rates, never
-// billed vendor spend — reuse `costCaveat()`'s wording, never "billed".
+// Mirrors `arie.api.schemas.UsageAgainstLimitsResponse`.
+//
+// Three cost concepts, never mixed — see `arie.ledger.cost_basis`:
+//
+//   actual_spend_usd         confirmed money billed. Reporting only; a
+//                            free-tier or credit-funded real call is $0.00
+//                            here and that is the true answer.
+//   estimated_live_cost_usd  what using live services was worth, at
+//                            list/credit-equivalent prices, free tiers
+//                            included. This is what the allowance gates,
+//                            because it stays meaningful when billing is
+//                            unknown or zero-rated.
+//   modelled_spend_usd       simulated catalogue / evaluation pricing.
+//                            Reporting only; consumes no allowance.
+//
+// The previous `modeled_spend_*` triple is gone. It gated the allowance on
+// fictional catalogue prices, which is how one organization exhausted a
+// $50/month ceiling entirely on test fixtures.
 
 export interface UsageAgainstLimitsResponse {
   leads_used: number;
   leads_limit: number;
   leads_remaining: number;
-  modeled_spend_used_usd: number;
-  modeled_spend_limit_usd: number;
-  modeled_spend_remaining_usd: number;
+  estimated_live_spend_used_usd: number;
+  estimated_live_spend_limit_usd: number;
+  estimated_live_spend_remaining_usd: number;
+  actual_spend_usd: number;
+  estimated_live_cost_usd: number;
+  modelled_spend_usd: number;
   max_csv_rows_per_upload: number;
   period_start: string;
   period_end: string;

@@ -134,13 +134,40 @@ export default function UsagePage() {
                     tone={limits.leads_remaining === 0 ? "reject" : "default"}
                   />
                   <Stat label="Leads remaining" value={limits.leads_remaining} />
+                  {/* The allowance gates *estimated live usage*, not billed
+                      money: a free tier, a pre-paid credit, or a vendor that
+                      reports no per-call charge all leave actual spend at zero
+                      while real requests keep going out. */}
                   <Stat
-                    label="Modeled spend used"
-                    hint={`of ${formatUsd(limits.modeled_spend_limit_usd, 2)}`}
-                    value={formatUsd(limits.modeled_spend_used_usd, 2)}
-                    tone={limits.modeled_spend_remaining_usd <= 0 ? "reject" : "default"}
+                    label="Live usage"
+                    hint={`of ${formatUsd(limits.estimated_live_spend_limit_usd, 2)}`}
+                    value={formatUsd(limits.estimated_live_spend_used_usd, 2)}
+                    tone={limits.estimated_live_spend_remaining_usd <= 0 ? "reject" : "default"}
                   />
                   <Stat label="Max CSV rows / upload" value={limits.max_csv_rows_per_upload} />
+                </StatRow>
+              </div>
+              <div className="mt-6 border-t border-border pt-5">
+                <p className="mb-3 text-sm text-text-muted">
+                  Three different things, kept apart. Only live usage counts against the
+                  allowance.
+                </p>
+                <StatRow>
+                  <Stat
+                    label="Actual billed"
+                    hint="confirmed charges"
+                    value={formatUsd(limits.actual_spend_usd, 2)}
+                  />
+                  <Stat
+                    label="Estimated live usage"
+                    hint="list price, free tiers included"
+                    value={formatUsd(limits.estimated_live_cost_usd, 2)}
+                  />
+                  <Stat
+                    label="Modelled / simulated"
+                    hint="evaluation pricing, never billed"
+                    value={formatUsd(limits.modelled_spend_usd, 2)}
+                  />
                 </StatRow>
               </div>
               <div className="mt-6 border-t border-border pt-5">
@@ -153,7 +180,7 @@ export default function UsagePage() {
                   />
                 </StatRow>
               </div>
-              {(limits.leads_remaining === 0 || limits.modeled_spend_remaining_usd <= 0) && (
+              {(limits.leads_remaining === 0 || limits.estimated_live_spend_remaining_usd <= 0) && (
                 <p className="mt-4 flex items-center gap-2 rounded-md border border-reject-edge bg-reject-dim px-3 py-2 text-sm text-text">
                   <CircleAlert
                     aria-hidden
